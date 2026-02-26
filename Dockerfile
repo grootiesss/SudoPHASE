@@ -11,7 +11,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY . /app
 
 # Build the solver binary as described in the project docs
-RUN make -f markdowns/Makefile
+# Ensure object directory exists for Makefile outputs
+RUN mkdir -p obj && make -f markdowns/Makefile
 
 # Install Python dependencies for the webapp
 RUN pip install --no-cache-dir -r webapp/requirements.txt
