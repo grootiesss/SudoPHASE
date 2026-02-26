@@ -353,7 +353,8 @@ std::vector<int> ParallelSudokuAntSystem::GenerateMatchArray()
 {
 	std::vector<int> matchArray(numSubColonies);
 	std::iota(matchArray.begin(), matchArray.end(), 0);
-	std::shuffle(matchArray.begin(), matchArray.end(), masterRandGen);
+	// Use random_shuffle for broad compiler support
+	std::random_shuffle(matchArray.begin(), matchArray.end());
 	return matchArray;
 }
 

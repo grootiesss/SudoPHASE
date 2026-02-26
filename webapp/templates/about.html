@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SudoPHASE – About Game</title>
+  <style>
+    :root {
+      /* Dark theme (default) */
+      --bg: #1a1b26;
+      --surface: #24283b;
+      --text: #c0caf5;
+      --accent: #7aa2f7;
+      --border: #3b4261;
+    }
+    :root[data-theme="light"] {
+      /* Light theme */
+      --bg: #f5f7ff;
+      --surface: #ffffff;
+      --text: #1f2335;
+      --accent: #3366ff;
+      --border: #c5cee0;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      min-height: 100vh;
+      padding: 2rem;
+      line-height: 1.6;
+    }
+    .wrap { max-width: 640px; margin: 0 auto; }
+    a.back {
+      display: inline-block; color: var(--accent); font-size: 0.95rem; text-decoration: none;
+      margin-bottom: 1.5rem;
+    }
+    a.back:hover { text-decoration: underline; }
+    h1 { font-size: 1.75rem; color: var(--accent); margin-bottom: 0.5rem; }
+    h2 { font-size: 1.2rem; color: var(--accent); margin-top: 1.5rem; margin-bottom: 0.5rem; }
+    p { margin: 0.5rem 0; }
+    ul { margin: 0.5rem 0; padding-left: 1.5rem; }
+    li { margin: 0.25rem 0; }
+    .subtitle { font-size: 0.9rem; opacity: 0.85; margin-bottom: 1.5rem; }
+
+    .theme-toggle {
+      position: fixed;
+      top: 0.75rem;
+      right: 0.75rem;
+      padding: 0.35rem 0.9rem;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(0,0,0,0.15);
+      color: var(--text);
+      font-size: 0.8rem;
+      cursor: pointer;
+      backdrop-filter: blur(6px);
+      z-index: 10;
+    }
+    .theme-toggle:hover { filter: brightness(1.1); }
+  </style>
+</head>
+<body>
+  <button type="button" id="themeToggle" class="theme-toggle">Light theme</button>
+  <div class="wrap">
+    <a href="/" class="back">← Main menu</a>
+    <h1>About SudoPHASE</h1>
+    <p class="subtitle">Parallel Ant Colony + Simulated Annealing · Sudoku solver and player</p>
+
+    <h2>Rules of Sudoku</h2>
+    <p>Sudoku is a number-placement puzzle. The goal is to fill the grid so that:</p>
+    <ul>
+      <li><strong>Every row</strong> contains each digit (1–9 for 9×9, 1–16 for 16×16, 1–25 for 25×25) exactly once.</li>
+      <li><strong>Every column</strong> contains each digit exactly once.</li>
+      <li><strong>Every sub-grid (block)</strong> contains each digit exactly once. In 9×9 the blocks are 3×3; in 16×16 they are 4×4; in 25×25 they are 5×5.</li>
+    </ul>
+    <p>Some cells are pre-filled (clues). You fill the empty cells without changing the clues. A valid puzzle has exactly one solution.</p>
+
+    <h2>How to use the application</h2>
+
+    <h3>Main menu</h3>
+    <ul>
+      <li><strong>Play</strong> — Open the puzzle screen. Choose a puzzle from the library, use one you created, or play an uploaded instance, then solve it yourself or use the solver.</li>
+      <li><strong>Create Puzzle</strong> — Build your own puzzle: pick a size (9×9, 16×16, or 25×25), fill in the clues, then click “Play this puzzle” to open it in Play mode.</li>
+      <li><strong>Upload Puzzle</strong> — Select a text file in the same format as the curated instances; the puzzle is loaded directly into the Play screen.</li>
+      <li><strong>About Game</strong> — This page: rules and usage.</li>
+    </ul>
+
+    <h3>Play screen</h3>
+    <p><strong>Puzzle library (left panel)</strong></p>
+    <ul>
+      <li>Select <strong>Size</strong> (9×9, 16×16, or 25×25). The list shows puzzle instances from <code>instances/curated-dataset</code> for that size.</li>
+      <li>Click an instance in the list, then <strong>Load selected</strong> to load it into the grid.</li>
+    </ul>
+    <p><strong>Parameters</strong></p>
+    <ul>
+      <li><strong>Timeout (s)</strong> — Maximum time (seconds) the solver may run before stopping.</li>
+      <li><strong>Threads (colonies)</strong> — Number of parallel “colonies” used by the solver (more can be faster on multi-core machines).</li>
+      <li><strong>SOLVE PUZZLE</strong> — Runs the built-in solver (Ant Colony + Simulated Annealing) to fill in the solution. When a solution is found, digits are animated into the grid so you can watch the construction; if the timeout is reached first, the best result is shown.</li>
+    </ul>
+    <p><strong>Grid and input</strong></p>
+    <ul>
+      <li>Click a cell to select it (highlighted border). Pre-filled clues are fixed and cannot be edited or erased.</li>
+      <li>When you select a non-fixed cell, all cells in the same row, column, and block are highlighted as <strong>peers</strong> (with light blue shading in the light theme).</li>
+      <li><strong>Digit buttons</strong> — Click a digit (1–9, 1–16, or 1–25) to place it in the selected cell. Only empty or non-fixed cells accept input.</li>
+      <li><strong>Undo</strong> — Reverts the last change (digit entry, erase, load, or solve).</li>
+      <li><strong>Erase</strong> — Clears the selected cell if it is not a fixed clue.</li>
+      <li>If a digit you place breaks the rules (duplicate in row, column, or block), that digit and any duplicates are <strong>highlighted in red</strong> until you fix them.</li>
+    </ul>
+    <p><strong>Clear</strong> — Empties all cells (under the grid). Use this to start over on the same size; fixed clues are removed.</p>
+
+    <h3>Create Puzzle screen</h3>
+    <ul>
+      <li>Choose a size (9×9, 16×16, or 25×25).</li>
+      <li>Fill in the clue cells using the digit buttons. Empty cells will be the ones the player must solve.</li>
+      <li>Click <strong>Play this puzzle</strong> to open the puzzle in Play mode so you can solve it or run the solver.</li>
+    </ul>
+
+    <h2>Tips</h2>
+    <ul>
+      <li>Use the puzzle library to try different instances. Increase timeout or threads if the solver does not finish in time.</li>
+      <li>When creating a puzzle, make sure clues do not repeat in the same row, column, or block; otherwise the puzzle has no valid solution.</li>
+      <li>Use the theme toggle in the top-right corner (Light / Dark) to switch between light and dark modes; your choice is remembered across pages.</li>
+    </ul>
+  </div>
+  <script>
+    const THEME_KEY = 'sudophaseTheme';
+
+    function applyTheme(theme) {
+      if (theme !== 'light' && theme !== 'dark') theme = 'dark';
+      document.documentElement.setAttribute('data-theme', theme);
+      const btn = document.getElementById('themeToggle');
+      if (btn) btn.textContent = theme === 'dark' ? 'Light theme' : 'Dark theme';
+    }
+
+    function initThemeToggle() {
+      const stored = localStorage.getItem(THEME_KEY) || 'dark';
+      applyTheme(stored);
+      const btn = document.getElementById('themeToggle');
+      if (!btn) return;
+      btn.addEventListener('click', () => {
+        const current = document.documentElement.getAttribute('data-theme') || 'dark';
+        const next = current === 'dark' ? 'light' : 'dark';
+        localStorage.setItem(THEME_KEY, next);
+        applyTheme(next);
+      });
+    }
+
+    initThemeToggle();
+  </script>
+</body>
+</html>

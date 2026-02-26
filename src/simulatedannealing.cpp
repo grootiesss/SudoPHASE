@@ -8,6 +8,7 @@
 #include <unordered_set>
 #include <unordered_map>
 #include <random>
+#include <algorithm> // for std::shuffle
 #include <cmath>
 #include <iostream>
 #include <cstdlib>
@@ -172,8 +173,8 @@ void SudokuSA::FillEmptyCells()
                 missing.push_back(n);
         }
 
-        // Shuffle missing numbers
-        std::shuffle(missing.begin(), missing.end(), gen);
+        // Shuffle missing numbers (use random_shuffle for broad compiler support)
+        std::random_shuffle(missing.begin(), missing.end());
 
         // Fill only empty (non-fixed) cells
         for (size_t i = 0; i < emptyCells.size(); i++)

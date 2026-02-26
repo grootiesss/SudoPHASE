@@ -1,6 +1,12 @@
+<<<<<<< HEAD
 # MT-CP-ACS-SA: Multi-Threaded ACO-SA for Sudoku
 
 A C++ Sudoku solver based on **Ant Colony Optimization (ACS)** with **Simulated Annealing (SA)** and **parallel multi-colony** search. The parallel variant uses a ring topology and random matching for pheromone exchange between sub-colonies (RMACO-style).
+=======
+# MT-ACS-RING: Multi-Threaded Ant Colony System for Sudoku
+
+A C++ Sudoku solver based on **Ant Colony Optimization (ACS)** with **Simulated Annealing (SA)** and optional **parallel multi-colony** search. The parallel variant uses a ring topology and random matching for pheromone exchange between sub-colonies (RMACO-style).
+>>>>>>> dedef782b (Add webapp UI and deployment assets)
 
 ## Description
 
@@ -8,15 +14,25 @@ This project implements three solving methods:
 
 | Algorithm | Description |
 |-----------|-------------|
+<<<<<<< HEAD
 | **0** | Single-colony Ant Colony System (ACS) with optional SA (modified). Lloyd & Amos, IEEE Trans. on Games (2021). |
 | **1** | Exact backtracking search (reference / validation). |
 | **2** | **Parallel ACS**: multiple colonies in separate threads; ring + random topology; three-source pheromone update; adaptive exchange interval. Yang et al., "RMACO: a randomly matched parallel ant colony optimization," World Wide Web (2016). |
+=======
+| **0** | Single-colony Ant Colony System (ACS) with optional SA. Lloyd & Amos, IEEE Trans. on Games (2021). |
+| **1** | Exact backtracking search (reference / validation). |
+| **2** | **Parallel ACS**: multiple sub-colonies in separate threads; ring + random topology; three-source pheromone update; adaptive exchange interval. Yang et al., "RMACO: a randomly matched parallel ant colony optimization," World Wide Web (2016). |
+>>>>>>> dedef782b (Add webapp UI and deployment assets)
 
 Features:
 
 - **9×9, 16×16, and 25×25** Sudoku (order 3, 4, 5).
 - **Simulated Annealing**: optional application every `safreq` iterations (`--safreq`); conservative/hybrid or always-accept (CP-like) via `--saAccept`.
 - **Command-line** and **file-based** puzzle input; batch runs via the included Python script.
+<<<<<<< HEAD
+=======
+- **Web app**: a minimal Flask app in `webapp/` lets you solve 9×9 puzzles in the browser; the solver runs on the server and uses multiple processors (see **Deploying as web/desktop app** below).
+>>>>>>> dedef782b (Add webapp UI and deployment assets)
 
 ## Dataset
 
@@ -29,12 +45,20 @@ Puzzle instances are under the `instances/` directory:
 | `instances/9x9-database` | 9×9 instance set (e.g. `9x9_00001.txt`, ranges). |
 | `instances/16x16-database` | 16×16 instance set (e.g. `16x16_02203.txt`). |
 | `instances/25x25-database` | 25×25 instance set. |
+<<<<<<< HEAD
 | `instances/curated-dataset` | Optional curated dataset (used on conference paper proposal). |
+=======
+| `instances/curated-dataset` | Optional curated dataset (may be provided as a zip). |
+>>>>>>> dedef782b (Add webapp UI and deployment assets)
 
 **Puzzle file format (for `--file`):**
 
 - Line 1: **order** (e.g. `3` for 9×9, `4` for 16×16, `5` for 25×25).
+<<<<<<< HEAD
 - Line 2: unused integer (e.g. `0`) but was originially used as the fixed-cell percentage value (Lloyd and Amos).
+=======
+- Line 2: unused integer (e.g. `0`).
+>>>>>>> dedef782b (Add webapp UI and deployment assets)
 - Remaining: space-separated **cell values** in row-major order:
   - `-1` = empty cell
   - `1`–`9` for 9×9 → digits `1`–`9`
@@ -61,9 +85,20 @@ Example (9×9, first line “3”, second “0”, then 81 values with `-1` for 
    make -f markdowns/Makefile
    ```
 
+<<<<<<< HEAD
 The makefile uses g++ to compile. However, any C++ compiler should work, as long as it supports the C++11 standard.
 
 Alternatively, for windows, there is a Visual Studio 2017 project file in the vs2017 folder.
+=======
+2. The executable is produced as **`sudokusolver`** in the project root.
+
+**Windows (PowerShell):**
+
+```powershell
+New-Item -ItemType Directory -Force -Path obj
+make -f markdowns/Makefile
+```
+>>>>>>> dedef782b (Add webapp UI and deployment assets)
 
 If you use a Visual Studio build that produces `sudoku_ants.exe`, place it in the repo root or under `vs2017/x64/Release/` (or set the script’s `--solver`; see below).
 
@@ -80,7 +115,11 @@ All options use a double-dash prefix, e.g. `--file`, `--alg`.
 | `--alg` | int | 0 | Solver: **0** = ACS, **1** = backtracking, **2** = parallel ACS. |
 | `--timeout` | int | 120 | Time limit in seconds. |
 | `--ants` | int | 10 | Number of ants (alg 0 and 2). |
+<<<<<<< HEAD
 | `--subcolonies` | int | 4 | Number of colonies (alg 2 only), naming convention "subcolonies" was not still changed to "colonies". |
+=======
+| `--subcolonies` | int | 4 | Number of sub-colonies (alg 2 only). |
+>>>>>>> dedef782b (Add webapp UI and deployment assets)
 | `--q0` | float | 0.9 | ACS exploitation probability. |
 | `--rho` | float | 0.9 | ACS pheromone decay (global update). |
 | `--evap` | float | 0.005 | Best-so-far evaporation (e.g. best-evap). |
@@ -181,6 +220,15 @@ If you have a file `instances/general/my_puzzle.txt` in the format above:
 
 Successful run (verbose) will print the solution grid, solve time, iteration count, and for alg 2 whether communication occurred.
 
+<<<<<<< HEAD
+=======
+## Deploying as web or desktop application
+
+- **Web app:** From the repo root, run `pip install -r webapp/requirements.txt` and `python webapp/app.py`, then open http://127.0.0.1:5000. The solver runs on the server with `--alg 2` and uses the **Sub-colonies** setting (threads) to exploit multiple processors.
+- **Desktop app:** From the repo root, run `python desktop/sudoku_desktop.py`. A Tkinter window opens with a 9×9 grid; set **Sub-colonies** to your CPU count and click **Solve**. No browser or server needed; the solver runs locally. See `desktop/README.md`.
+- **Other stacks:** See `markdowns/DEPLOYMENT_APP.md` for production deployment, Electron, Qt, mobile, etc.
+
+>>>>>>> dedef782b (Add webapp UI and deployment assets)
 ## References
 
 - Lloyd & Amos, IEEE Trans. on Games (2021) — ACS core for Sudoku.
