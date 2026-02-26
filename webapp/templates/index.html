@@ -218,6 +218,78 @@
       z-index: 10;
     }
     .theme-toggle:hover { filter: brightness(1.1); }
+
+    /* ===== Responsive layout for tablets & phones ===== */
+    @media (max-width: 900px) {
+      body {
+        flex-direction: column;
+        padding: 0.5rem;
+        align-items: stretch;
+      }
+
+      .library-panel {
+        width: 100%;
+        max-width: 600px;
+        margin: 0 auto;
+        order: 2;
+      }
+
+      .main-area {
+        width: 100%;
+        order: 1;
+      }
+
+      .grid-wrap {
+        max-width: min(95vw, 480px);
+      }
+
+      .pad-wrap {
+        width: 100%;
+        max-width: 480px;
+      }
+
+      .digit-row {
+        flex-wrap: wrap;
+      }
+
+      .digit-btn {
+        width: 2.4rem;
+        height: 2.4rem;
+      }
+
+      .theme-toggle {
+        top: 0.5rem;
+        right: 0.5rem;
+      }
+    }
+
+    /* Extra-small phones */
+    @media (max-width: 480px) {
+      body {
+        padding: 0.25rem;
+      }
+
+      h1 {
+        font-size: 1.2rem;
+      }
+
+      .library-panel {
+        padding: 0.5rem;
+      }
+
+      .sudoku-grid input {
+        font-size: 0.9rem;
+      }
+
+      .action-btn {
+        padding: 0.5rem 0.75rem;
+        min-width: 0;
+      }
+
+      button {
+        font-size: 0.85rem;
+      }
+    }
   </style>
 </head>
 <body>
