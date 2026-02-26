@@ -65,7 +65,15 @@
     .main-area { flex: 1; display: flex; flex-direction: column; align-items: center; min-width: 0; position: relative; }
     h1 { font-size: 1.5rem; font-weight: 600; margin-bottom: 0.25rem; color: var(--accent); }
     .subtitle { font-size: 0.85rem; opacity: 0.8; margin-bottom: 0.75rem; }
-    .grid-wrap { padding: 0.5rem; background: var(--surface); border-radius: 8px; border: 1px solid var(--border); }
+    .grid-wrap {
+      padding: 0.5rem;
+      background: var(--surface);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      width: min(95vw, 480px);
+      max-width: 480px;
+      aspect-ratio: 1 / 1;
+    }
     .pad-wrap { margin-top: 1rem; display: flex; flex-direction: column; align-items: center; gap: 0.75rem; max-width: 340px; }
     .action-buttons { display: flex; gap: 1rem; justify-content: center; }
     .action-btn {
@@ -91,7 +99,13 @@
       border-color: var(--accent);
       box-shadow: 0 0 0 1px var(--accent);
     }
-    .sudoku-grid { display: grid; gap: 0; border: 4px solid var(--block-border); }
+    .sudoku-grid {
+      display: grid;
+      gap: 0;
+      border: 4px solid var(--block-border);
+      width: 100%;
+      height: 100%;
+    }
     .sudoku-grid input {
       border: 1px solid var(--cell-border);
       background: var(--bg);
@@ -99,6 +113,8 @@
       font-size: 1.1rem;
       text-align: center;
       padding: 0;
+      width: 100%;
+      height: 100%;
     }
     .sudoku-grid input:focus { outline: none; border-color: var(--accent); background: var(--surface); }
     .sudoku-grid input.fixed { font-weight: bold; color: var(--accent); background: var(--surface); }
@@ -353,6 +369,7 @@
     initThemeToggle();
 
     const gridEl = document.getElementById('grid');
+    const gridWrapEl = document.querySelector('.grid-wrap');
     const resultEl = document.getElementById('result');
     const solveBtn = document.getElementById('solveBtn');
     const clearBtn = document.getElementById('clearBtn');
@@ -590,10 +607,22 @@
       const cells = n * n;
       gridEl.innerHTML = '';
       const maxVal = MAX_VAL[order];
-      const cellSize = order === 3 ? '3rem' : order === 4 ? '2.3rem' : '1.6rem';
-      const fontSize = order === 3 ? '1.55rem' : order === 4 ? '1.15rem' : '0.88rem';
-      gridEl.style.gridTemplateColumns = `repeat(${n}, ${cellSize})`;
-      gridEl.style.gridTemplateRows = `repeat(${n}, ${cellSize})`;
+      gridEl.style.gridTemplateColumns = `repeat(${n}, 1fr)`;
+      gridEl.style.gridTemplateRows = `repeat(${n}, 1fr)`;
+
+      // Adjust overall board size depending on puzzle order:
+      // - 9×9: compact
+      // - 16×16: medium
+      // - 25×25: larger so cells stay readable on desktop
+      if (gridWrapEl) {
+        if (order === 3) {
+          gridWrapEl.style.maxWidth = '420px';
+        } else if (order === 4) {
+          gridWrapEl.style.maxWidth = '520px';
+        } else {
+          gridWrapEl.style.maxWidth = '720px';
+        }
+      }
       for (let i = 0; i < cells; i++) {
         const row = Math.floor(i / n);
         const col = i % n;
@@ -602,7 +631,6 @@
         input.inputMode = 'numeric';
         input.maxLength = order === 3 ? 1 : 2;
         input.dataset.index = i;
-        input.style.fontSize = fontSize;
         if ((col + 1) % order === 0 && col !== n - 1) input.classList.add('block-right');
         if ((row + 1) % order === 0 && row !== n - 1) input.classList.add('block-bottom');
         input.addEventListener('focus', () => {
