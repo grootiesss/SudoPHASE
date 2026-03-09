@@ -8,9 +8,12 @@ class SudokuSA
     Board currentSol;
     int bestCost;
     double acceptanceProbability;
+    double tInit_;
+    double tMin_;
+    double cooling_;
 
 public:	
-	SudokuSA(Board sol): sol(sol) {}
+	SudokuSA(Board sol, double tInit = 1.5, double tMin = 0.01, double cooling = 0.995);
     int Anneal();
     int ComputeCost();
     void FillEmptyCells();

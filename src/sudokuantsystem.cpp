@@ -109,7 +109,7 @@ bool SudokuAntSystem::Solve(const Board& puzzle, float maxTime )
 		// Apply Simulated Annealing (CP-adapted implementation) if enabled and at frequency interval
 		if (!solved && saFrequency > 0 && iter % saFrequency == 0 && iter != 0)
 		{
-			SudokuSA sa(bestSol);
+			SudokuSA sa(bestSol, saTinit, saTmin, saCooling);
 			int cost = sa.Anneal();
 			Board saSolution = sa.GetSolution();
 			int saScore = saSolution.FixedCellCount();

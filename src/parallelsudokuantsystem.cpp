@@ -308,10 +308,13 @@ void SubColony::UpdateBestSolution(const Board& solution, int score)
 // Constructor: Create the parallel system with N sub-colonies
 // ----------------------------------------------------------------------------
 ParallelSudokuAntSystem::ParallelSudokuAntSystem(int nSubColonies, int numAntsPerColony,
-	float q0, float rho, float pher0, float bestEvap, int safreq, bool saAlwaysAcceptFlag)
+	float q0, float rho, float pher0, float bestEvap, int safreq, bool saAlwaysAcceptFlag,
+	double saTinit, double saTmin, double saCooling,
+	int commEarlyVal, int commLateVal, int commThresholdVal, bool streamProgressFlag)
 	: numSubColonies(nSubColonies), maxTime(120.0f),
 	  globalBestScore(0), iterationsCompleted(0), communicationOccurred(false), solTime(0.0f), barrier(0), stopFlag(false),
-	  saFrequency(safreq), saAlwaysAccept(saAlwaysAcceptFlag)
+	  saFrequency(safreq), saAlwaysAccept(saAlwaysAcceptFlag), saTinit(saTinit), saTmin(saTmin), saCooling(saCooling),
+	  commEarly(commEarlyVal), commLate(commLateVal), commThreshold(commThresholdVal), streamProgress(streamProgressFlag)
 {
 	// === INPUT VALIDATION ===
 	// Ensure at least 1 sub-colony
@@ -339,13 +342,13 @@ ParallelSudokuAntSystem::~ParallelSudokuAntSystem()
 		delete colony;
 }
 
-// Yang et al. RMACO: adaptive exchange cycle (Corollary 3). Before 200 iters: long interval; after: short.
+// Yang et al. RMACO: adaptive exchange cycle (Corollary 3). Before commThreshold iters: commEarly; after: commLate.
 int ParallelSudokuAntSystem::CalculateInterval(int iteration)
 {
-	if (iteration < 200)
-		return 100;
+	if (iteration < commThreshold)
+		return commEarly;
 	else
-		return 10;
+		return commLate;
 }
 
 // Yang et al. RMACO: match-array = random permutation of [0..n-1]; used for best-so-far exchange.
@@ -488,21 +491,35 @@ bool ParallelSudokuAntSystem::CheckTimeout()
 // ----------------------------------------------------------------------------
 void ParallelSudokuAntSystem::ReportProgress(int colonyId, int iteration, SubColony* colony, const Board& puzzle)
 {
-	if (colonyId == 0 && iteration % 50 == 0)
+	if (colonyId != 0 || iteration % 20 != 0)
+		return;
+	std::lock_guard<std::mutex> lock(commMutex);
+	// Find global best across all colonies
+	int globalBest = 0;
+	int bestColony = -1;
+	for (int i = 0; i < numSubColonies; i++)
 	{
-		std::lock_guard<std::mutex> lock(commMutex);
-		
-		// Find global best across all colonies
-		int globalBest = 0;
-		for (int i = 0; i < numSubColonies; i++)
+		int score = subColonies[i]->GetBestSolScore();
+		if (score > globalBest)
 		{
-			int score = subColonies[i]->GetBestSolScore();
-			if (score > globalBest)
-				globalBest = score;
+			globalBest = score;
+			bestColony = i;
 		}
-		
-		std::cerr << "Progress: iteration " << iteration << " (Global best-so-far: " 
+	}
+	if (!streamProgress)
+	{
+		std::cerr << "Progress: iteration " << iteration << " (Global best-so-far: "
 		          << globalBest << "/" << puzzle.CellCount() << ")" << std::endl;
+		return;
+	}
+	// Output best-so-far board to stdout for webapp live display (useNumbers=false so '.' for empty cells)
+	if (bestColony >= 0 && globalBest > puzzle.FixedCellCount())
+	{
+		const Board& best = subColonies[bestColony]->GetBestSol();
+		std::cout << "BestSoFar:" << std::endl;
+		std::cout << best.AsString(false) << std::endl;
+		std::cout << "---" << std::endl;
+		std::cout.flush();
 	}
 }
 
@@ -688,7 +705,7 @@ void ParallelSudokuAntSystem::SubColonyWorker(int colonyId, const Board& puzzle)
 		if (saFrequency > 0 && iter % saFrequency == 0 && iter != 0)
 		{
 			// Apply SA to best-so-far solution (same SA as single-colony and CP codebase)
-			SudokuSA sa(colony->GetBestSol());
+			SudokuSA sa(colony->GetBestSol(), saTinit, saTmin, saCooling);
 			int cost = sa.Anneal();
 			Board saSolution = sa.GetSolution();
 			

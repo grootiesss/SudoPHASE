@@ -16,6 +16,7 @@ class SudokuAntSystem : public SudokuSolver, public IAntColony
 	float bestEvap;
 	int saFrequency;   // SA frequency (0 = disabled). Paper: sa_freq (Stodola et al.). Set from --safreq; SA every saFrequency iters.
 	bool saAlwaysAccept;  // If true, always accept SA result (CP-like); else accept only when improvement or cost 0
+	double saTinit, saTmin, saCooling;  // SA schedule: initial temp, stopping temp, cooling rate (--saTinit, --saTmin, --saCooling)
 	Board bestSol;
 	float bestPher;
 	int bestVal;
@@ -35,8 +36,10 @@ class SudokuAntSystem : public SudokuSolver, public IAntColony
 	float PherAdd(int numCellsFixed);
 
 public:
-	SudokuAntSystem(int numAnts, float q0, float rho, float pher0, float bestEvap, int safreq = 0, bool saAlwaysAcceptFlag = false) : 
-		numAnts(numAnts), q0(q0), rho(rho), pher0(pher0), bestEvap(bestEvap), saFrequency(safreq), saAlwaysAccept(saAlwaysAcceptFlag), iterationsCompleted(0)
+	SudokuAntSystem(int numAnts, float q0, float rho, float pher0, float bestEvap, int safreq = 0, bool saAlwaysAcceptFlag = false,
+	                double saTinit = 1.5, double saTmin = 0.01, double saCooling = 0.995) : 
+		numAnts(numAnts), q0(q0), rho(rho), pher0(pher0), bestEvap(bestEvap), saFrequency(safreq), saAlwaysAccept(saAlwaysAcceptFlag),
+		saTinit(saTinit), saTmin(saTmin), saCooling(saCooling), iterationsCompleted(0)
 	{
 		for ( int i = 0; i < numAnts; i++ )
 			antList.push_back(new SudokuAnt(this));

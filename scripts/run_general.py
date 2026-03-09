@@ -176,8 +176,8 @@ def build_solver_command(
 
     if args.ants is not None:
         cmd.extend(("--ants", str(args.ants)))
-    if args.subcolonies is not None:
-        cmd.extend(("--subcolonies", str(args.subcolonies)))
+    if args.threads is not None:
+        cmd.extend(("--threads", str(args.threads)))
     if args.q0 is not None:
         cmd.extend(("--q0", str(args.q0)))
     if args.rho is not None:
@@ -188,6 +188,13 @@ def build_solver_command(
         cmd.extend(("--safreq", str(args.safreq)))
     if getattr(args, "sa_accept", 0) == 1:
         cmd.extend(("--saAccept", "1"))
+    cmd.extend(("--saTinit", str(args.sa_tinit)))
+    cmd.extend(("--saTmin", str(args.sa_tmin)))
+    cmd.extend(("--saCooling", str(args.sa_cooling)))
+    if args.alg == 2:
+        cmd.extend(("--commEarly", str(args.comm_early)))
+        cmd.extend(("--commLate", str(args.comm_late)))
+        cmd.extend(("--commThreshold", str(args.comm_threshold)))
     # Always add verbose for algorithms 0 and 2 to get iteration count
     if args.alg == 0 or args.alg == 2 or args.solver_verbose:
         cmd.append("--verbose")
@@ -294,7 +301,7 @@ def parse_solver_output(stdout: str, stderr: str) -> Tuple[Optional[bool], Optio
 
 def write_csv(output_path: Path, rows: Sequence[dict]) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    fieldnames = ["alg", "puzzle_size", "f%", "instance_id", "instance_path", "ants", "subcolonies", "q0", "rho", "bve", "safreq", "saAccept", "timeout", "success_rate", "time_mean", "time_std", "iter_mean", "with_comm", "without_comm"]
+    fieldnames = ["alg", "puzzle_size", "f%", "instance_id", "instance_path", "ants", "threads", "q0", "rho", "bve", "safreq", "saAccept", "saTinit", "saTmin", "saCooling", "commEarly", "commLate", "commThreshold", "timeout", "success_rate", "time_mean", "time_std", "iter_mean", "with_comm", "without_comm"]
     with output_path.open("w", newline="", encoding="utf-8") as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
@@ -341,8 +348,8 @@ def summarize_group(size_label: str, fixed_percentage: Optional[int], stats: dic
     # Get actual ant count (default is 10)
     actual_ants = args.ants if args.ants is not None else 10
     
-    # Get actual subcolonies count (default is 4)
-    actual_subcolonies = args.subcolonies if args.subcolonies is not None else 4
+    # Get actual threads count (default is 4)
+    actual_threads = args.threads if args.threads is not None else 4
 
     return {
         "alg": args.alg,
@@ -351,12 +358,18 @@ def summarize_group(size_label: str, fixed_percentage: Optional[int], stats: dic
         "instance_id": instance_id if instance_id is not None else "",
         "instance_path": instance_path if instance_path is not None else "",
         "ants": actual_ants,
-        "subcolonies": actual_subcolonies,
+        "threads": actual_threads,
         "q0": args.q0,
         "rho": args.rho,
         "bve": args.evap,
         "safreq": args.safreq if (args.alg == 0 or args.alg == 2) else "",
         "saAccept": args.sa_accept if (args.alg == 0 or args.alg == 2) else "",
+        "saTinit": args.sa_tinit if (args.alg == 0 or args.alg == 2) else "",
+        "saTmin": args.sa_tmin if (args.alg == 0 or args.alg == 2) else "",
+        "saCooling": args.sa_cooling if (args.alg == 0 or args.alg == 2) else "",
+        "commEarly": args.comm_early if args.alg == 2 else "",
+        "commLate": args.comm_late if args.alg == 2 else "",
+        "commThreshold": args.comm_threshold if args.alg == 2 else "",
         "timeout": args.timeout,
         "success_rate": round(success_rate, 2),
         "time_mean": average_time,
@@ -375,12 +388,18 @@ def main() -> int:
     parser.add_argument("--alg", type=int, default=0, help="Solver algorithm (0=ACS, 1=backtracking).")
     parser.add_argument("--timeout", type=float, default=120.0, help="Timeout per puzzle in seconds (default: 120).")
     parser.add_argument("--ants", type=int, default=None, help="Override number of ants (ACS only).")
-    parser.add_argument("--subcolonies", type=int, default=None, help="Number of sub-colonies for parallel ACS (alg=2, default: 4).")
+    parser.add_argument("--threads", type=int, default=None, help="Number of threads (parallel colonies) for parallel ACS (alg=2, default: 4).")
     parser.add_argument("--q0", type=float, default=0.9, help="Override ACS q0 parameter.")
     parser.add_argument("--rho", type=float, default=0.9, help="Override ACS rho parameter.")
     parser.add_argument("--evap", type=float, default=0.005, help="Override ACS evaporation parameter.")
     parser.add_argument("--safreq", type=int, default=0, help="Simulated Annealing frequency - apply SA every n iterations (0 = disabled, default: 0).")
     parser.add_argument("--saAccept", type=int, default=0, dest="sa_accept", choices=[0, 1], help="SA acceptance: 0=conservative/hybrid (default), 1=always accept SA result (CP-like). Applies to alg 0 and alg 2.")
+    parser.add_argument("--saTinit", type=float, default=1.5, dest="sa_tinit", help="SA initial temperature (default: 1.5).")
+    parser.add_argument("--saTmin", type=float, default=0.01, dest="sa_tmin", help="SA stopping temperature (default: 0.01).")
+    parser.add_argument("--saCooling", type=float, default=0.995, dest="sa_cooling", help="SA cooling rate per step (default: 0.995).")
+    parser.add_argument("--commEarly", type=int, default=100, dest="comm_early", help="Parallel ACS (alg=2): communication interval when iter < commThreshold (default: 100).")
+    parser.add_argument("--commLate", type=int, default=10, dest="comm_late", help="Parallel ACS (alg=2): communication interval when iter >= commThreshold (default: 10).")
+    parser.add_argument("--commThreshold", type=int, default=200, dest="comm_threshold", help="Parallel ACS (alg=2): iteration at which to switch from commEarly to commLate (default: 200).")
     parser.add_argument("--limit", type=int, default=None, help="Optional cap on number of instances to process.")
     parser.add_argument("--range-start", dest="range_start", default=None, help="Include only instances with stem >= this (e.g. 2020_00004 or 16x16_02203). Use with --range-end.")
     parser.add_argument("--range-end", dest="range_end", default=None, help="Include only instances with stem <= this (e.g. 2020_00483 or 16x16_02436). Use with --range-start.")
@@ -652,8 +671,8 @@ def main() -> int:
     # Get actual ant count (default is 10)
     actual_ants = args.ants if args.ants is not None else 10
     
-    # Get actual subcolonies count (default is 4)
-    actual_subcolonies = args.subcolonies if args.subcolonies is not None else 4
+    # Get actual threads count (default is 4)
+    actual_threads = args.threads if args.threads is not None else 4
 
     print("===== Summary =====")
     print(f"Solver binary   : {solver_path}")
@@ -664,13 +683,20 @@ def main() -> int:
     print(f"Algorithm       : {args.alg}")
     print(f"Ants            : {actual_ants}")
     if args.alg == 2:
-        print(f"Sub-colonies    : {actual_subcolonies}")
+        print(f"Threads         : {actual_threads}")
     print(f"q0              : {args.q0}")
     print(f"rho             : {args.rho}")
     print(f"bve             : {args.evap}")
     if args.alg == 0 or args.alg == 2:
         print(f"SA frequency    : {args.safreq} ({'enabled' if args.safreq > 0 else 'disabled'})")
         print(f"SA accept       : {args.sa_accept} ({'always accept (CP-like)' if args.sa_accept == 1 else 'conservative/hybrid'})")
+        print(f"SA Tinit        : {args.sa_tinit}")
+        print(f"SA Tmin         : {args.sa_tmin}")
+        print(f"SA cooling      : {args.sa_cooling}")
+    if args.alg == 2:
+        print(f"commEarly       : {args.comm_early}")
+        print(f"commLate        : {args.comm_late}")
+        print(f"commThreshold   : {args.comm_threshold}")
     print(f"Timeout         : {args.timeout}s")
     print(f"Total puzzles   : {total}")
     print(f"Succeeded       : {successes}")

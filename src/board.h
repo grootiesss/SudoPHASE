@@ -13,7 +13,7 @@ public:
 	Board(const Board &other);
 	~Board();
 
-	string AsString(bool useNmbers=false, bool showUnfixed = false);
+	string AsString(bool useNumbers=false, bool showUnfixed = false) const;
 	int FixedCellCount(void) const;
 	int InfeasibleCellCount(void) const;
 	void SetCell(int i, const ValueSet &c );

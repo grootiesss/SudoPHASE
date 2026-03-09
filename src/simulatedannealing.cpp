@@ -13,12 +13,17 @@
 #include <iostream>
 #include <cstdlib>
 
+SudokuSA::SudokuSA(Board sol, double tInit, double tMin, double cooling)
+    : sol(sol), tInit_(tInit), tMin_(tMin), cooling_(cooling)
+{
+}
+
 int SudokuSA::Anneal()
 {
     FillEmptyCells();
-    double coolingRate = 0.995;
-    double stoppingTemp = 0.01;
-    double temp = 1.5;
+    double coolingRate = cooling_;
+    double stoppingTemp = tMin_;
+    double temp = tInit_;
     int currentCost = ComputeCost();
     int worst = 0;
     int moves = 0;

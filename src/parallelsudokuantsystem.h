@@ -134,10 +134,17 @@ private:
 	
 	int saFrequency;  // SA frequency (0 = disabled). Paper: sa_freq (Stodola et al.). Set from --safreq; SA every saFrequency iters.
 	bool saAlwaysAccept; // If true, always accept SA solution regardless of quality
-	
+	double saTinit, saTmin, saCooling;  // SA schedule (--saTinit, --saTmin, --saCooling)
+	int commEarly;
+	int commLate;
+	int commThreshold;
+	bool streamProgress;  // If true, output best-so-far solution to stdout during solve (for webapp live display)
+
 public:
 	ParallelSudokuAntSystem(int numSubColonies, int numAntsPerColony, 
-	                        float q0, float rho, float pher0, float bestEvap, int safreq = 0, bool saAlwaysAccept = false);
+	                        float q0, float rho, float pher0, float bestEvap, int safreq = 0, bool saAlwaysAccept = false,
+	                        double saTinit = 1.5, double saTmin = 0.01, double saCooling = 0.995,
+	                        int commEarly = 100, int commLate = 10, int commThreshold = 200, bool streamProgress = false);
 	~ParallelSudokuAntSystem();
 	
 	virtual bool Solve(const Board& puzzle, float maxTime);

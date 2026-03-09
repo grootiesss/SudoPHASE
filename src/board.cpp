@@ -149,7 +149,7 @@ int Board::BoxForCell(int iCell) const
 	return order*(iCell / (order*order*order)) + ((iCell%(order*order))/order);
 }
 
-string Board::AsString(bool useNumbers, bool showUnfixed )
+string Board::AsString(bool useNumbers, bool showUnfixed) const
 {
 	/*
 	  Form a human-readable string from the board, using either numbers (1..numUnits) or a single character

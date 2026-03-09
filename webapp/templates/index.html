@@ -317,10 +317,27 @@
     <label>Instances:</label>
     <ul class="library-list" id="libraryList"></ul>
     <button type="button" id="loadBtn">Load selected</button>
-    <div class="params-container">
-      <h2 class="params-header">Parameters</h2>
-      <label>Timeout (s): <input type="number" id="timeout" value="120" min="5" max="600"></label>
-      <label>Threads (colonies): <input type="number" id="subcolonies" value="4" min="1" max="32"></label>
+    <div class="params-container" style="overflow-y:auto; padding-right:0.25rem;">
+      <h2 class="params-header" style="font-size: 1.1rem; margin-bottom: 0.5rem;">Parameters</h2>
+      <h2 class="params-header">General</h2>
+      <label style="display:flex; justify-content:space-between; align-items:center;">Timeout (s): <input type="number" id="timeout" value="120" min="5" max="600" style="width: 4.5rem; text-align:right;"></label>
+      
+      <h2 class="params-header" style="margin-top:0.5rem; font-size:0.95rem;">Ant Colony System</h2>
+      <label style="display:flex; justify-content:space-between; align-items:center;">Number of Ants: <input type="number" id="ants" value="10" min="1" style="width: 4.5rem; text-align:right;"></label>
+      <label style="display:flex; justify-content:space-between; align-items:center;">Evap. Rate: <input type="number" id="evap" value="0.005" min="0.001" max="0.999" step="0.001" style="width: 4.5rem; text-align:right;"></label>
+
+      <h2 class="params-header" style="margin-top:0.5rem; font-size:0.95rem;">Simulated Annealing</h2>
+      <label style="display:flex; justify-content:space-between; align-items:center;">Initial Temp: <input type="number" id="saTinit" value="1.5" step="0.1" min="0.1" style="width: 4.5rem; text-align:right;"></label>
+      <label style="display:flex; justify-content:space-between; align-items:center;">Stopping Temp: <input type="number" id="saTmin" value="0.01" step="0.01" min="0.0001" style="width: 4.5rem; text-align:right;"></label>
+      <label style="display:flex; justify-content:space-between; align-items:center;">Frequency: <input type="number" id="safreq" value="50" min="0" style="width: 4.5rem; text-align:right;"></label>
+      <label style="display:flex; justify-content:space-between; align-items:center;">Cooling Rate: <input type="number" id="saCooling" value="0.995" min="0.001" max="0.999" step="0.001" style="width: 4.5rem; text-align:right;"></label>
+
+      <h2 class="params-header" style="margin-top:0.5rem; font-size:0.95rem;">Multithreaded</h2>
+      <label style="display:flex; justify-content:space-between; align-items:center;">Thread Count: <input type="number" id="threads" value="4" min="1" max="32" style="width: 4.5rem; text-align:right;"></label>
+      <label style="display:flex; justify-content:space-between; align-items:center;">Comm. Threshold: <input type="number" id="commThreshold" value="200" min="1" style="width: 4.5rem; text-align:right;"></label>
+      <label style="display:flex; justify-content:space-between; align-items:center;">Early Comm.: <input type="number" id="commEarly" value="100" min="1" style="width: 4.5rem; text-align:right;"></label>
+      <label style="display:flex; justify-content:space-between; align-items:center;">Late Comm.: <input type="number" id="commLate" value="10" min="1" style="width: 4.5rem; text-align:right;"></label>
+
       <button type="button" id="solveBtn" class="btn-solve">SOLVE PUZZLE</button>
     </div>
   </aside>
@@ -805,8 +822,9 @@
       recomputeConflicts();
     }
 
-    function setSolution(puzzle, solution, order) {
+    function setSolution(puzzle, solution, order, instant) {
       // Animate construction of the solver's solution so cells fill in progressively.
+      // If instant is true, fill all cells immediately (for real-time best_solution updates).
       const inputs = gridEl.querySelectorAll('input');
       const n = order * order;
       const len = n * n;
@@ -841,6 +859,16 @@
         }
       }
 
+      if (instant) {
+        steps.forEach(function(s) {
+          const inp = inputs[s.index];
+          if (inp) { inp.value = s.value; inp.classList.add('filled'); }
+        });
+        recomputeConflicts();
+        clearUserSolveTimer();
+        return;
+      }
+
       // Shuffle steps so cells are filled in random order.
       for (let i = steps.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -848,8 +876,8 @@
       }
 
       let stepIndex = 0;
-      const batchSize = 1;    // one cell per frame for a slower, stepped animation
-      const delayMs = 60;     // delay between frames (ms)
+      const batchSize = 12;   // cells per frame for a faster fill
+      const delayMs = 25;      // delay between frames (ms)
 
       function applyNextBatch() {
         if (stepIndex >= steps.length) {
@@ -983,6 +1011,19 @@
         showResult({ error: 'Grid is already full' }, true);
         return;
       }
+
+      const evapVal = parseFloat(document.getElementById('evap').value);
+      if (isNaN(evapVal) || evapVal <= 0 || evapVal >= 1) {
+        alert("Invalid input for Evaporation Rate. Value must be strictly between 0 and 1.");
+        return;
+      }
+
+      const saCoolingVal = parseFloat(document.getElementById('saCooling').value);
+      if (isNaN(saCoolingVal) || saCoolingVal <= 0 || saCoolingVal >= 1) {
+        alert("Invalid input for Cooling Rate. Value must be strictly between 0 and 1.");
+        return;
+      }
+
       snapshotGrid();
       solving = true;
       solveBtn.disabled = true;
@@ -1003,7 +1044,16 @@
             body: JSON.stringify({
               puzzle,
               timeout,
-              subcolonies: parseInt(document.getElementById('subcolonies').value, 10) || 4,
+              threads: parseInt(document.getElementById('threads').value, 10) || 4,
+              ants: parseInt(document.getElementById('ants').value, 10) || 10,
+              evap: parseFloat(document.getElementById('evap').value) || 0.005,
+              saTinit: parseFloat(document.getElementById('saTinit').value) || 1.5,
+              saTmin: parseFloat(document.getElementById('saTmin').value) || 0.01,
+              safreq: parseInt(document.getElementById('safreq').value, 10) || 50,
+              saCooling: parseFloat(document.getElementById('saCooling').value) || 0.995,
+              commThreshold: parseInt(document.getElementById('commThreshold').value, 10) || 200,
+              commEarly: parseInt(document.getElementById('commEarly').value, 10) || 100,
+              commLate: parseInt(document.getElementById('commLate').value, 10) || 10,
               alg: 2,
               order: currentOrder
             }),
@@ -1048,7 +1098,8 @@
                   resolve(data);
                   return;
                 }
-                setTimeout(poll, 400);
+                if (data.best_solution) setSolution(puzzle, data.best_solution, currentOrder, true);
+                setTimeout(poll, 150);
               } catch (e) {
                 reject(e);
               }
@@ -1062,12 +1113,12 @@
             showResult(res, true);
           } else {
             showResult(res, !!res.error);
-            if (res.success && res.solution) setSolution(puzzle, res.solution, currentOrder);
+            if (res.success && res.solution) setSolution(puzzle, res.solution, currentOrder, false);
           }
         } else {
           resultEl.classList.remove('loading');
           showResult(postData, !!postData.error);
-          if (postData.success && postData.solution) setSolution(puzzle, postData.solution, currentOrder);
+          if (postData.success && postData.solution) setSolution(puzzle, postData.solution, currentOrder, false);
         }
       } catch (e) {
         resultEl.classList.remove('loading');

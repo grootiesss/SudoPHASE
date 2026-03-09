@@ -1,8 +1,8 @@
 """
 Minimal web app for the MT-ACS-RING Sudoku solver.
-Serves a 9x9 grid UI and runs the C++ solver (with --alg 2 and --subcolonies) on the server.
+Serves a 9x9 grid UI and runs the C++ solver (with --alg 2 and --threads) on the server.
 Solver runs in a background thread so the server stays responsive; the C++ binary itself
-uses multiple threads (subcolonies). Multithreaded implementation is retained.
+uses multiple threads. Multithreaded implementation is retained.
 """
 from __future__ import annotations
 
@@ -154,7 +154,51 @@ def parse_verbose_stdout(stdout: str, order: int = 3) -> dict:
                         pass
                 break
 
-    # Extract solution grid: between "Solution:" and "solved in"
+    def extract_grid_from_block(block: str) -> str | None:
+        """Extract flat solution string from a grid block (Solution: full; BestSoFar: may be partial)."""
+        if order == 3:
+            cells = cell_pattern.findall(block)
+            if len(cells) >= num_cells:
+                return "".join(cells[:num_cells])
+        else:
+            all_nums = re.findall(r"\d+", block)
+            max_val = order * order
+            values = [int(s) for s in all_nums if 1 <= int(s) <= max_val][:num_cells]
+            if len(values) == num_cells:
+                if order == 4:
+                    return "".join(
+                        chr(ord("0") + v - 1) if v <= 10 else chr(ord("a") + v - 11)
+                        for v in values
+                    )
+                return "".join(chr(ord("a") + v - 1) for v in values)
+        return None
+
+    def extract_partial_grid(block: str) -> str | None:
+        """Extract partial grid (chars + '.') for BestSoFar - C++ AsString(false) output."""
+        if order == 3:
+            pat = re.compile(r"[1-9.]")
+        elif order == 4:
+            pat = re.compile(r"[0-9a-fA-F.]")
+        else:
+            pat = re.compile(r"[a-yA-Y.]")
+        chars = pat.findall(block)[:num_cells]
+        if not chars:
+            return None
+        return ("".join(chars) + "." * num_cells)[:num_cells]
+
+    # Extract BestSoFar blocks (partial solutions during solve - uses char+dot format)
+    # Board output has "---" inside grid separators; only a line exactly "---" ends the block
+    for i, line in enumerate(lines):
+        if "BestSoFar:" in line:
+            end = i + 1
+            while end < len(lines) and lines[end].strip() != "---":
+                end += 1
+            block = " ".join(lines[i + 1 : end])
+            sol = extract_partial_grid(block)
+            if sol:
+                out["solution"] = sol
+
+    # Extract final solution: between "Solution:" and "solved in"
     solution_start = None
     solution_end = None
     for i, line in enumerate(lines):
@@ -165,29 +209,27 @@ def parse_verbose_stdout(stdout: str, order: int = 3) -> dict:
             break
     if solution_start is not None and solution_end is not None:
         block = " ".join(lines[solution_start:solution_end])
-        if order == 3:
-            cells = cell_pattern.findall(block)
-            if len(cells) >= num_cells:
-                out["solution"] = "".join(cells[:num_cells])
-        else:
-            # C++ prints numbers: 16×16 prints 1-16, 25×25 prints 1-25
-            all_nums = re.findall(r"\d+", block)
-            max_val = order * order
-            values = [int(s) for s in all_nums if 1 <= int(s) <= max_val][:num_cells]
-            if len(values) == num_cells:
-                if order == 4:
-                    out["solution"] = "".join(
-                        chr(ord("0") + v - 1) if v <= 10 else chr(ord("a") + v - 11)
-                        for v in values
-                    )
-                else:
-                    out["solution"] = "".join(chr(ord("a") + v - 1) for v in values)
+        sol = extract_grid_from_block(block)
+        if sol:
+            out["solution"] = sol
 
     return out
 
 
-def _run_solver_sync(puzzle: str, timeout: int, subcolonies: int, alg: int, order: int = 3) -> dict:
-    """Run C++ solver in current thread. Returns result dict for one job."""
+def _run_solver_sync(
+    job_id: str | None,
+    puzzle: str,
+    timeout: int,
+    threads: int,
+    alg: int,
+    order: int = 3,
+    extra_params: dict | None = None,
+) -> dict:
+    """
+    Run C++ solver. If job_id is set, read stdout in real time and update
+    _job_store[job_id]["best_solution"] whenever a solution block is parsed.
+    Returns result dict for one job.
+    """
     try:
         solver_path = find_solver()
     except FileNotFoundError as e:
@@ -200,18 +242,55 @@ def _run_solver_sync(puzzle: str, timeout: int, subcolonies: int, alg: int, orde
         "--verbose",
     ]
     if alg == 2:
-        cmd.extend(["--subcolonies", str(subcolonies)])
+        cmd.extend(["--threads", str(threads), "--stream"])
+    if extra_params:
+        for k, v in extra_params.items():
+            cmd.extend([f"--{k}", str(v)])
     try:
-        result = subprocess.run(
+        proc = subprocess.Popen(
             cmd,
             cwd=str(REPO_ROOT),
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            timeout=timeout + 15,
+            bufsize=1,
         )
-        parsed = parse_verbose_stdout(result.stdout or "", order=order)
-        if result.returncode != 0 and parsed["success"] is None:
-            parsed["raw_error"] = (result.stderr or result.stdout or "").strip() or f"Exit code {result.returncode}"
+        buffer_lines: list[str] = []
+
+        def reader() -> None:
+            if proc.stdout:
+                for line in iter(proc.stdout.readline, ""):
+                    buffer_lines.append(line)
+                    full = "".join(buffer_lines)
+                    parsed = parse_verbose_stdout(full, order=order)
+                    if parsed.get("solution") and job_id is not None:
+                        with _job_store_lock:
+                            job = _job_store.get(job_id)
+                            if job and job.get("status") == "pending":
+                                _job_store[job_id] = {**job, "best_solution": parsed["solution"]}
+
+        reader_thread = threading.Thread(target=reader, daemon=True)
+        reader_thread.start()
+
+        try:
+            proc.wait(timeout=timeout + 15)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
+            raise
+
+        reader_thread.join(timeout=2.0)
+        buffer = "".join(buffer_lines)
+        if proc.stderr:
+            stderr_output = proc.stderr.read()
+        else:
+            stderr_output = ""
+
+        parsed = parse_verbose_stdout(buffer, order=order)
+
+        if proc.returncode != 0 and parsed["success"] is None:
+            parsed["raw_error"] = stderr_output.strip() or f"Exit code {proc.returncode}"
+
         return {
             "status": "done",
             "result": {
@@ -222,6 +301,7 @@ def _run_solver_sync(puzzle: str, timeout: int, subcolonies: int, alg: int, orde
                 "communication": parsed["communication"],
                 "error": parsed.get("raw_error"),
             },
+            "best_solution": parsed["solution"],
         }
     except subprocess.TimeoutExpired:
         return {"status": "error", "result": {"error": "Solver timeout"}}
@@ -229,14 +309,19 @@ def _run_solver_sync(puzzle: str, timeout: int, subcolonies: int, alg: int, orde
         return {"status": "error", "result": {"error": str(e)}}
 
 
-def _worker(job_id: str, puzzle: str, timeout: int, subcolonies: int, alg: int, order: int) -> None:
-    """Background thread: run solver and store result."""
+def _worker(job_id: str, puzzle: str, timeout: int, threads: int, alg: int, order: int, extra_params: dict) -> None:
+    """Background thread: run solver with streaming stdout and store result."""
     try:
-        outcome = _run_solver_sync(puzzle, timeout, subcolonies, alg, order)
+        outcome = _run_solver_sync(job_id, puzzle, timeout, threads, alg, order, extra_params)
     except Exception as e:
         outcome = {"status": "error", "result": {"error": str(e)}}
     with _job_store_lock:
-        _job_store[job_id] = outcome
+        existing = _job_store.get(job_id, {})
+        _job_store[job_id] = {
+            "status": outcome["status"],
+            "result": outcome.get("result"),
+            "best_solution": outcome.get("best_solution") or existing.get("best_solution"),
+        }
 
 
 @app.route("/")
@@ -301,8 +386,8 @@ def get_instance(filename: str):
 @app.route("/api/solve", methods=["POST"])
 def solve():
     """
-    POST JSON: { "puzzle": "...", "timeout": 120, "subcolonies": 4, "alg": 2 }
-    Starts the C++ solver in a background thread (multithreaded: subcolonies inside C++).
+    POST JSON: { "puzzle": "...", "timeout": 120, "threads": 4, "alg": 2 }
+    Starts the C++ solver in a background thread (multithreaded: threads inside C++).
     Returns: { "job_id": "..." }. Poll GET /api/status/<job_id> for result.
     """
     try:
@@ -315,16 +400,31 @@ def solve():
         if len(puzzle) != expected_len:
             return jsonify({"error": f"Puzzle must be {expected_len} characters for order {order}"}), 400
         timeout = int(data.get("timeout", 120))
-        subcolonies = int(data.get("subcolonies", 4))
+        threads = int(data.get("threads", 4))
         alg = int(data.get("alg", 2))
+
+        extra_params = {}
+        for param_name, param_type, default_val in [
+            ("ants", int, 10),
+            ("evap", float, 0.005),
+            ("saTinit", float, 1.5),
+            ("saTmin", float, 0.01),
+            ("safreq", int, 50),
+            ("saCooling", float, 0.995),
+            ("commThreshold", int, 200),
+            ("commEarly", int, 100),
+            ("commLate", int, 10),
+        ]:
+            if param_name in data:
+                extra_params[param_name] = param_type(data[param_name])
 
         job_id = str(uuid.uuid4())
         with _job_store_lock:
-            _job_store[job_id] = {"status": "pending", "result": None}
+            _job_store[job_id] = {"status": "pending", "result": None, "best_solution": None}
 
         t = threading.Thread(
             target=_worker,
-            args=(job_id, puzzle, timeout, subcolonies, alg, order),
+            args=(job_id, puzzle, timeout, threads, alg, order, extra_params),
             daemon=True,
         )
         t.start()
