@@ -44,7 +44,7 @@ void SudokuAnt::StepSolution()
 				choice <<= 1;
 			}
 			sol.SetCell(iCell, best);
-			parent->LocalPheromoneUpdate(iCell, best.Index());  // Eq. 3: tau <- (1-xi)*tau + xi*tau0, xi=0.1
+			parent->LocalPheromoneUpdate(iCell, best.Index());  // Eq. 3: tau <- (1-xi)*tau + xi*tau0 (--xi)
 		}
 		else
 		{
@@ -69,7 +69,7 @@ void SudokuAnt::StepSolution()
 				if (roulette[i] > rouletteVal)
 				{
 					sol.SetCell(iCell, rouletteVals[i]);
-					parent->LocalPheromoneUpdate(iCell, rouletteVals[i].Index());  // Eq. 3
+					parent->LocalPheromoneUpdate(iCell, rouletteVals[i].Index());  // Eq. 3 (--xi)
 					break;
 				}
 			}

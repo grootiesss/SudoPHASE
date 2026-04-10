@@ -53,7 +53,18 @@
     .library-panel h2 { font-size: 1rem; margin: 0 0 0.25rem 0; color: var(--accent); }
     .library-panel label { font-size: 0.85rem; }
     .library-panel select { width: 100%; padding: 0.35rem; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 4px; }
-    .library-list { flex: 1; min-height: 120px; overflow-y: auto; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); list-style: none; margin: 0; padding: 0.25rem; font-size: 0.8rem; }
+    .library-list {
+      flex: 0 0 auto;
+      height: 340px;
+      overflow-y: auto;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--bg);
+      list-style: none;
+      margin: 0;
+      padding: 0.25rem;
+      font-size: 0.8rem;
+    }
     .library-list li { padding: 0.25rem 0.4rem; cursor: pointer; border-radius: 3px; }
     .library-list li:hover { background: var(--surface); }
     .library-list li.selected { background: var(--accent); color: var(--bg); }
@@ -175,6 +186,64 @@
     .result.error { border-color: #f7768e; }
     .result .time { color: var(--success); font-weight: 600; }
     .result .meta { font-size: 0.85rem; opacity: 0.9; margin-top: 0.5rem; }
+    .download-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      z-index: 60;
+    }
+    .download-modal {
+      width: min(640px, 96vw);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem 1.35rem;
+    }
+    .download-modal h3 {
+      margin: 0 0 0.75rem 0;
+      color: var(--accent);
+      font-size: 1.65rem;
+    }
+    .download-modal fieldset { border: none; margin: 0 0 1.1rem 0; padding: 0; }
+    .download-modal legend {
+      font-size: 1.2rem;
+      margin-bottom: 0.55rem;
+      opacity: 0.95;
+      font-weight: 600;
+    }
+    .download-modal label {
+      display: block;
+      margin: 0.5rem 0;
+      font-size: 1.2rem;
+      line-height: 1.45;
+      cursor: pointer;
+    }
+    .download-modal label input {
+      margin-right: 0.55rem;
+      width: 1.1rem;
+      height: 1.1rem;
+      vertical-align: middle;
+    }
+    .download-modal .actions { display: flex; justify-content: flex-end; gap: 0.65rem; margin-top: 1rem; }
+    .download-modal .actions button {
+      padding: 0.55rem 1.2rem;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 1.05rem;
+    }
+    .download-modal .actions button.primary {
+      background: var(--accent);
+      border-color: transparent;
+      color: var(--bg);
+    }
     .loading { opacity: 0.7; }
 
     .cell-tooltip {
@@ -307,7 +376,13 @@
   <button type="button" id="themeToggle" class="theme-toggle">Light theme</button>
   <aside class="library-panel">
     <h2>Puzzle library</h2>
-    <p style="font-size:0.8rem;margin:0 0 0.5rem 0;opacity:0.9;">instances/curated-dataset</p>
+    <p style="font-size:0.8rem;margin:0 0 0.5rem 0;opacity:0.9;" id="libraryHint">instances/original database</p>
+    <label>Source:</label>
+    <select id="sourceSelect">
+      <option value="curated">Curated dataset</option>
+      <option value="created">Created puzzles</option>
+      <option value="upload">Upload .txt file</option>
+    </select>
     <label>Size:</label>
     <select id="sizeSelect">
       <option value="9×9">9×9</option>
@@ -317,6 +392,7 @@
     <label>Instances:</label>
     <ul class="library-list" id="libraryList"></ul>
     <button type="button" id="loadBtn">Load selected</button>
+    <button type="button" id="deleteCreatedBtn" style="display:none;background:transparent;border:1px solid var(--border);color:var(--text);margin-top:0.4rem;">Delete selected</button>
     <div class="params-container" style="overflow-y:auto; padding-right:0.25rem;">
       <h2 class="params-header" style="font-size: 1.1rem; margin-bottom: 0.5rem;">Parameters</h2>
       <h2 class="params-header">General</h2>
@@ -339,6 +415,8 @@
       <label style="display:flex; justify-content:space-between; align-items:center;">Late Comm.: <input type="number" id="commLate" value="10" min="1" style="width: 4.5rem; text-align:right;"></label>
 
       <button type="button" id="solveBtn" class="btn-solve">SOLVE PUZZLE</button>
+      <button type="button" id="stopBtn" style="width:100%;margin-top:0.35rem;padding:0.4rem 1rem;background:#f7768e;color:#111827;border:1px solid transparent;" disabled>Stop</button>
+      <button type="button" id="downloadBtn" style="width:100%;margin-top:0.35rem;padding:0.4rem 1rem;background:var(--surface);color:var(--text);border:1px solid var(--border);">Download</button>
     </div>
   </aside>
   <main class="main-area">
@@ -353,7 +431,27 @@
       <button type="button" id="clearBtn">Clear</button>
     </div>
     <div class="result" id="result" style="display: none;"></div>
+    <input type="file" id="uploadPuzzleInput" accept=".txt,text/plain" style="display:none">
   </main>
+  <div class="download-modal-backdrop" id="downloadBackdrop">
+    <div class="download-modal">
+      <h3>Download</h3>
+      <fieldset>
+        <legend>Content</legend>
+        <label><input type="radio" name="dlKind" value="initial" checked> Initial puzzle (clues only)</label>
+        <label><input type="radio" name="dlKind" value="progress"> Puzzle Solved/Progress (initial + current grid)</label>
+      </fieldset>
+      <fieldset>
+        <legend>Document type</legend>
+        <label><input type="radio" name="dlFmt" value="txt" checked> Text (.txt)</label>
+        <label><input type="radio" name="dlFmt" value="pdf"> PDF (.pdf)</label>
+      </fieldset>
+      <div class="actions">
+        <button type="button" id="downloadCancelBtn">Cancel</button>
+        <button type="button" class="primary" id="downloadOkBtn">Download</button>
+      </div>
+    </div>
+  </div>
 
   <script>
     const THEME_KEY = 'sudophaseTheme';
@@ -384,15 +482,19 @@
     const resultEl = document.getElementById('result');
     const solveBtn = document.getElementById('solveBtn');
     const clearBtn = document.getElementById('clearBtn');
+    const sourceSelect = document.getElementById('sourceSelect');
     const sizeSelect = document.getElementById('sizeSelect');
     const libraryList = document.getElementById('libraryList');
     const loadBtn = document.getElementById('loadBtn');
+    const deleteCreatedBtn = document.getElementById('deleteCreatedBtn');
+    const libraryHint = document.getElementById('libraryHint');
     const subtitle = document.getElementById('subtitle');
     const numberPad = document.getElementById('numberPad');
 
     const SIZES = { '9×9': 3, '16×16': 4, '25×25': 5 };
     const CELLS = { 3: 81, 4: 256, 5: 625 };
     const MAX_VAL = { 3: 9, 4: 16, 5: 25 };
+    const CREATED_KEY = 'sudophaseCreatedPuzzles';
     let libraryData = {};
     let currentOrder = 3;
     let currentSizeLabel = '9×9';
@@ -920,13 +1022,44 @@
 
     function refreshLibraryList() {
       const size = sizeSelect.value;
-      const list = libraryData[size] || [];
+      const source = sourceSelect ? sourceSelect.value : 'curated';
+      if (loadBtn) loadBtn.disabled = (source === 'upload');
+      const sizeLabelWrap = sizeSelect ? sizeSelect.closest('label') : null;
+      if (sizeLabelWrap) sizeLabelWrap.style.display = (source === 'upload') ? 'none' : '';
+      if (source === 'upload') {
+        libraryList.innerHTML = '';
+        const li = document.createElement('li');
+        li.style.listStyle = 'none';
+        li.style.cursor = 'default';
+        li.style.padding = '0.5rem 0.35rem';
+        const p = document.createElement('p');
+        p.style.margin = '0 0 0.65rem 0';
+        p.style.fontSize = '0.9rem';
+        p.textContent = 'Curated-style .txt (order, idum, grid rows). Use the button below.';
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.style.padding = '0.4rem 0.8rem';
+        btn.style.borderRadius = '8px';
+        btn.style.border = '1px solid var(--border)';
+        btn.style.background = 'var(--accent)';
+        btn.style.color = 'var(--bg)';
+        btn.style.fontWeight = '600';
+        btn.style.cursor = 'pointer';
+        btn.textContent = 'Choose .txt file';
+        btn.addEventListener('click', () => document.getElementById('uploadPuzzleInput').click());
+        li.appendChild(p);
+        li.appendChild(btn);
+        libraryList.appendChild(li);
+        return;
+      }
+      const list = (source === 'curated') ? (libraryData[size] || []) : getCreatedPuzzlesBySize(size);
       libraryList.innerHTML = '';
       list.forEach((item, idx) => {
         const li = document.createElement('li');
         li.textContent = item.name;
         li.dataset.path = item.path;
         li.dataset.index = idx;
+        if (item.id) li.dataset.id = item.id;
         li.addEventListener('click', () => {
           libraryList.querySelectorAll('li').forEach(l => l.classList.remove('selected'));
           li.classList.add('selected');
@@ -935,11 +1068,41 @@
       });
       if (!list.length) {
         const li = document.createElement('li');
-        li.textContent = '(no instances for this size)';
+        li.textContent = (source === 'created') ? '(no created puzzles for this size)' : '(no instances for this size)';
         li.style.pointerEvents = 'none';
         li.style.opacity = '0.7';
         libraryList.appendChild(li);
       }
+    }
+
+    function safeJsonParse(text, fallback) {
+      try { return JSON.parse(text); } catch (_) { return fallback; }
+    }
+
+    function getCreatedPuzzles() {
+      const raw = localStorage.getItem(CREATED_KEY);
+      const parsed = raw ? safeJsonParse(raw, []) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    }
+
+    function setCreatedPuzzles(list) {
+      localStorage.setItem(CREATED_KEY, JSON.stringify(Array.isArray(list) ? list : []));
+    }
+
+    function getCreatedPuzzlesBySize(sizeLabel) {
+      const order = SIZES[sizeLabel] || 3;
+      const list = getCreatedPuzzles()
+        .filter(p => p && p.order === order && typeof p.puzzle === 'string')
+        .map(p => ({
+          id: p.id,
+          name: p.name || 'Created puzzle',
+          order: p.order,
+          puzzle: p.puzzle,
+          createdAt: p.createdAt || 0
+        }));
+      // Most recent first
+      list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      return list;
     }
 
     async function loadLibrary() {
@@ -950,6 +1113,29 @@
       } catch (e) {
         libraryList.innerHTML = '<li style="color:#f7768e">Failed to load library</li>';
       }
+    }
+
+    function updateLibraryHint() {
+      const source = sourceSelect ? sourceSelect.value : 'curated';
+      if (!libraryHint) return;
+      libraryHint.textContent = source === 'created'
+        ? 'saved locally in this browser'
+        : source === 'upload'
+          ? 'upload puzzle from .txt file'
+          : 'instances/original database';
+      if (deleteCreatedBtn) deleteCreatedBtn.style.display = (source === 'created') ? 'block' : 'none';
+    }
+
+    if (sourceSelect) {
+      sourceSelect.addEventListener('change', () => {
+        updateLibraryHint();
+        // If switching to curated, ensure we have data
+        if (sourceSelect.value === 'curated' && (!libraryData || !Object.keys(libraryData).length)) {
+          loadLibrary();
+        } else {
+          refreshLibraryList();
+        }
+      });
     }
 
     sizeSelect.addEventListener('change', () => {
@@ -971,33 +1157,196 @@
 
     loadBtn.addEventListener('click', async () => {
       const sel = libraryList.querySelector('li.selected');
-      if (!sel || !sel.dataset.path) return;
+      const source = sourceSelect ? sourceSelect.value : 'curated';
+      if (source === 'upload') {
+        alert('Use “Choose .txt file” in the list above.');
+        return;
+      }
+      if (!sel) return;
       const path = sel.dataset.path;
       try {
         snapshotGrid();
-        const r = await fetch('/api/instance/' + encodeURIComponent(path));
-        if (!r.ok) { const d = await r.json().catch(() => ({})); showResult(d, true); return; }
-        const data = await r.json();
-        const order = data.order;
-        const puzzle = data.puzzle;
-        createGrid(order);
-        initialPuzzle = puzzle;
-        puzzleToGrid(puzzle, order, puzzle);
-        currentPuzzleName = path.split('/').pop() || path;
-        resultEl.style.display = 'none';
-        startUserSolveTimer();
-        updateSolveButton();
-        updateSubtitle();
+        if (source === 'created') {
+          const id = sel.dataset.id;
+          const list = getCreatedPuzzles();
+          const match = list.find(p => String(p.id) === String(id));
+          if (!match) { showResult({ error: 'Created puzzle not found (local storage).' }, true); return; }
+          const order = match.order;
+          const puzzle = match.puzzle;
+          createGrid(order);
+          initialPuzzle = puzzle;
+          puzzleToGrid(puzzle, order, puzzle);
+          currentPuzzleName = match.name || 'Created puzzle';
+          resultEl.style.display = 'none';
+          lastSolvedSolution = null;
+          const pdfClear = document.getElementById('downloadBtn');
+          if (pdfClear) pdfClear.style.display = 'block';
+          startUserSolveTimer();
+          updateSolveButton();
+          updateSubtitle();
+        } else {
+          if (!path) return;
+          const r = await fetch('/api/instance/' + encodeURIComponent(path));
+          if (!r.ok) { const d = await r.json().catch(() => ({})); showResult(d, true); return; }
+          const data = await r.json();
+          const order = data.order;
+          const puzzle = data.puzzle;
+          createGrid(order);
+          initialPuzzle = puzzle;
+          puzzleToGrid(puzzle, order, puzzle);
+          currentPuzzleName = path.split('/').pop() || path;
+          resultEl.style.display = 'none';
+          lastSolvedSolution = null;
+          const pdfClear2 = document.getElementById('downloadBtn');
+          if (pdfClear2) pdfClear2.style.display = 'block';
+          startUserSolveTimer();
+          updateSolveButton();
+          updateSubtitle();
+        }
       } catch (e) {
         showResult({ error: e.message || 'Load failed' }, true);
       }
     });
 
+    if (deleteCreatedBtn) {
+      deleteCreatedBtn.addEventListener('click', () => {
+        const source = sourceSelect ? sourceSelect.value : 'curated';
+        if (source !== 'created') return;
+        const sel = libraryList.querySelector('li.selected');
+        if (!sel) { alert('Select a created puzzle first.'); return; }
+        const id = sel.dataset.id;
+        const name = sel.textContent || 'this puzzle';
+        if (!confirm(`Delete "${name}" from Created puzzles? This cannot be undone.`)) return;
+        const list = getCreatedPuzzles();
+        const next = list.filter(p => String(p.id) !== String(id));
+        setCreatedPuzzles(next);
+        refreshLibraryList();
+      });
+    }
+
     let solving = false;
+    let activeJobId = null;
+    let cancelRequested = false;
+    let lastSolvedSolution = null;
+    let lastSolvedParams = null;
+
+    function sanitizeDownloadBase(name, fallback) {
+      let s = String(name || '').trim().replace(/[<>:"/\\|?*\x00-\x1F]/g, '_');
+      return s || fallback;
+    }
+
+    function parseUploadedInstanceText(text) {
+      const rawLines = String(text).split(/\r?\n/).map(function(l) { return l.trim(); });
+      const lines = rawLines.filter(function(l) {
+        return l.length > 0 && l.charAt(0) !== '#';
+      });
+      if (lines.length < 2) throw new Error('Invalid file: need order and idum lines (comments # allowed).');
+      const order = parseInt(lines[0], 10);
+      if (![3, 4, 5].includes(order)) throw new Error('Unsupported order; use 3, 4, or 5.');
+      const numCells = Math.pow(order, 4);
+      const values = [];
+      for (let i = 2; i < lines.length; i++) {
+        const parts = lines[i].split(/\s+/);
+        for (let j = 0; j < parts.length; j++) {
+          const n = parseInt(parts[j], 10);
+          if (!Number.isNaN(n)) values.push(n);
+        }
+      }
+      if (values.length < numCells) throw new Error('Not enough grid values (expected ' + numCells + ').');
+      const slice = values.slice(0, numCells);
+      const out = [];
+      for (let k = 0; k < slice.length; k++) {
+        const v = slice[k];
+        if (v === -1) { out.push('.'); continue; }
+        if (order === 3) {
+          out.push((v >= 1 && v <= 9) ? String.fromCharCode(48 + v) : '.');
+        } else if (order === 4) {
+          if (v >= 1 && v <= 10) out.push(String.fromCharCode(48 + v - 1));
+          else if (v >= 11 && v <= 16) out.push(String.fromCharCode(97 + v - 11));
+          else out.push('.');
+        } else {
+          out.push((v >= 1 && v <= 25) ? String.fromCharCode(97 + v - 1) : '.');
+        }
+      }
+      return { order: order, puzzle: out.join('') };
+    }
+
+    function getParamsSnapshot() {
+      return {
+        timeout: parseInt(document.getElementById('timeout').value, 10) || 120,
+        threads: parseInt(document.getElementById('threads').value, 10) || 4,
+        ants: parseInt(document.getElementById('ants').value, 10) || 10,
+        evap: parseFloat(document.getElementById('evap').value) || 0.005,
+        saTinit: parseFloat(document.getElementById('saTinit').value) || 1.5,
+        saTmin: parseFloat(document.getElementById('saTmin').value) || 0.01,
+        safreq: parseInt(document.getElementById('safreq').value, 10) || 50,
+        saCooling: parseFloat(document.getElementById('saCooling').value) || 0.995,
+        commThreshold: parseInt(document.getElementById('commThreshold').value, 10) || 200,
+        commEarly: parseInt(document.getElementById('commEarly').value, 10) || 100,
+        commLate: parseInt(document.getElementById('commLate').value, 10) || 10,
+        alg: 2,
+        order: currentOrder
+      };
+    }
+
+    function triggerBlobDownload(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    async function runExperimentDownloadExport(kind, fmt) {
+      const len = CELLS[currentOrder] || 81;
+      if (!initialPuzzle || initialPuzzle === '.'.repeat(len)) {
+        alert('Load a puzzle first.');
+        return false;
+      }
+      const current = gridToPuzzle();
+      const manualSolved = checkUserCompleted();
+      const solverSolved = !!lastSolvedParams;
+      const reportKind = manualSolved ? 'solved' : 'progress';
+      const includeParams = manualSolved && solverSolved;
+      const solvedPayload = manualSolved ? current : '';
+      const stem = (currentPuzzleName || 'puzzle').replace(/\s+/g, '_');
+      const def = sanitizeDownloadBase((kind === 'initial' ? stem : (stem + '_progress')), kind === 'initial' ? 'puzzle' : 'progress');
+      const base = sanitizeDownloadBase(prompt('File name:', def), def);
+      const ext = fmt === 'pdf' ? '.pdf' : '.txt';
+      const filename = base.toLowerCase().endsWith(ext) ? base : base + ext;
+
+      const body = {
+        reportKind: kind === 'initial' ? 'initial' : reportKind,
+        includeParams: kind === 'initial' ? false : includeParams,
+        order: currentOrder,
+        puzzle: initialPuzzle,
+        currentPuzzle: kind === 'initial' ? '' : current,
+        solution: kind === 'initial' ? '' : solvedPayload,
+        params: (kind === 'initial' || !includeParams) ? {} : (lastSolvedParams || getParamsSnapshot())
+      };
+
+      const url = fmt === 'pdf' ? '/api/pdf' : '/api/export/report-txt';
+      const r = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      if (!r.ok) {
+        const t = await r.text().catch(function() { return ''; });
+        alert('Export failed' + (t ? ': ' + t : ''));
+        return false;
+      }
+      triggerBlobDownload(await r.blob(), filename);
+      return true;
+    }
+
     function updateSolveButton() {
       if (solving) return;
-      const puzzle = gridToPuzzle();
-      const hasEmpty = puzzle.includes('.');
+      // In Experiment Mode, enable Solve when the original clue puzzle has empties.
+      const hasEmpty = (initialPuzzle || '').includes('.');
       solveBtn.disabled = !hasEmpty;
       solveBtn.title = !hasEmpty ? 'Grid is already full' : 'Solve the puzzle';
     }
@@ -1006,8 +1355,9 @@
     gridEl.addEventListener('change', updateSolveButton);
 
     solveBtn.addEventListener('click', async () => {
-      const puzzle = gridToPuzzle();
-      if (!puzzle.includes('.')) {
+      // Always solve the original clue puzzle, not the grid with user entries.
+      const puzzle = initialPuzzle;
+      if (!puzzle || !puzzle.includes('.')) {
         showResult({ error: 'Grid is already full' }, true);
         return;
       }
@@ -1026,7 +1376,11 @@
 
       snapshotGrid();
       solving = true;
+      cancelRequested = false;
+      activeJobId = null;
       solveBtn.disabled = true;
+      const stopBtn = document.getElementById('stopBtn');
+      if (stopBtn) stopBtn.disabled = false;
       resultEl.style.display = 'block';
       resultEl.classList.remove('error');
       resultEl.innerHTML = 'Solving…';
@@ -1038,6 +1392,8 @@
         const id = setTimeout(() => controller.abort(), timeoutMs);
         let postRes, postData;
         try {
+          // Reset grid back to clues so animation matches what we're solving.
+          puzzleToGrid(initialPuzzle, currentOrder, initialPuzzle);
           postRes = await fetch('/api/solve', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1078,10 +1434,15 @@
         // Support both APIs: direct result (200) or job_id + polling (202)
         if (postData.job_id) {
           const jobId = postData.job_id;
+          activeJobId = jobId;
           const pollUntilDone = () => new Promise((resolve, reject) => {
             const deadline = Date.now() + timeoutMs;
             const poll = async () => {
               try {
+                if (cancelRequested) {
+                  resolve({ status: 'error', result: { error: 'Cancelled by user' } });
+                  return;
+                }
                 if (Date.now() > deadline) {
                   reject(new Error('Request timed out'));
                   return;
@@ -1113,7 +1474,27 @@
             showResult(res, true);
           } else {
             showResult(res, !!res.error);
-            if (res.success && res.solution) setSolution(puzzle, res.solution, currentOrder, false);
+            if (res.success && res.solution) {
+              setSolution(puzzle, res.solution, currentOrder, false);
+              lastSolvedSolution = res.solution;
+              lastSolvedParams = {
+                timeout,
+                threads: parseInt(document.getElementById('threads').value, 10) || 4,
+                ants: parseInt(document.getElementById('ants').value, 10) || 10,
+                evap: parseFloat(document.getElementById('evap').value) || 0.005,
+                saTinit: parseFloat(document.getElementById('saTinit').value) || 1.5,
+                saTmin: parseFloat(document.getElementById('saTmin').value) || 0.01,
+                safreq: parseInt(document.getElementById('safreq').value, 10) || 50,
+                saCooling: parseFloat(document.getElementById('saCooling').value) || 0.995,
+                commThreshold: parseInt(document.getElementById('commThreshold').value, 10) || 200,
+                commEarly: parseInt(document.getElementById('commEarly').value, 10) || 100,
+                commLate: parseInt(document.getElementById('commLate').value, 10) || 10,
+                alg: 2,
+                order: currentOrder
+              };
+              const pdfBtn = document.getElementById('downloadBtn');
+              if (pdfBtn) pdfBtn.style.display = 'block';
+            }
           }
         } else {
           resultEl.classList.remove('loading');
@@ -1126,9 +1507,57 @@
         showResult({ error: msg }, true);
       } finally {
         solving = false;
+        activeJobId = null;
+        cancelRequested = false;
         updateSolveButton();
+        const stopBtn = document.getElementById('stopBtn');
+        if (stopBtn) stopBtn.disabled = true;
       }
     });
+
+    const stopBtn = document.getElementById('stopBtn');
+    if (stopBtn) {
+      stopBtn.addEventListener('click', async () => {
+        if (!activeJobId) return;
+        cancelRequested = true;
+        stopBtn.disabled = true;
+        try {
+          await fetch('/api/cancel/' + encodeURIComponent(activeJobId), { method: 'POST' });
+          showResult({ error: 'Puzzle not solved (cancelled).' }, true);
+        } catch (e) {
+          showResult({ error: e.message || 'Cancel failed' }, true);
+        }
+      });
+    }
+
+    const downloadBackdrop = document.getElementById('downloadBackdrop');
+    const downloadCancelBtn = document.getElementById('downloadCancelBtn');
+    const downloadOkBtn = document.getElementById('downloadOkBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+
+    function openDownloadModal() {
+      downloadBackdrop.style.display = 'flex';
+    }
+    function closeDownloadModal() {
+      downloadBackdrop.style.display = 'none';
+    }
+    if (downloadBtn) downloadBtn.addEventListener('click', openDownloadModal);
+    if (downloadCancelBtn) downloadCancelBtn.addEventListener('click', closeDownloadModal);
+    if (downloadBackdrop) {
+      downloadBackdrop.addEventListener('click', function(e) {
+        if (e.target === downloadBackdrop) closeDownloadModal();
+      });
+    }
+    if (downloadOkBtn) {
+      downloadOkBtn.addEventListener('click', async function() {
+        const kindEl = document.querySelector('#downloadBackdrop input[name="dlKind"]:checked');
+        const fmtEl = document.querySelector('#downloadBackdrop input[name="dlFmt"]:checked');
+        const kind = kindEl ? kindEl.value : 'initial';
+        const fmt = fmtEl ? fmtEl.value : 'txt';
+        const ok = await runExperimentDownloadExport(kind, fmt);
+        if (ok) closeDownloadModal();
+      });
+    }
 
     clearBtn.addEventListener('click', () => {
       const len = CELLS[currentOrder] || 81;
@@ -1137,9 +1566,44 @@
       puzzleToGrid(initialPuzzle, currentOrder, initialPuzzle);
       currentPuzzleName = 'Empty grid';
       resultEl.style.display = 'none';
+      lastSolvedSolution = null;
+      const pdfClear = document.getElementById('downloadBtn');
+      if (pdfClear) pdfClear.style.display = 'block';
       clearUserSolveTimer();
       updateSolveButton();
       updateSubtitle();
+    });
+
+    document.getElementById('uploadPuzzleInput').addEventListener('change', function(e) {
+      const file = e.target.files && e.target.files[0];
+      e.target.value = '';
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function() {
+        try {
+          const parsed = parseUploadedInstanceText(reader.result);
+          snapshotGrid();
+          createGrid(parsed.order);
+          sizeSelect.value = parsed.order === 3 ? '9×9' : parsed.order === 4 ? '16×16' : '25×25';
+          currentOrder = parsed.order;
+          currentSizeLabel = sizeSelect.value;
+          initialPuzzle = parsed.puzzle;
+          puzzleToGrid(parsed.puzzle, parsed.order, parsed.puzzle);
+          currentPuzzleName = (file.name || '').replace(/\.txt$/i, '') || 'Uploaded';
+          lastSolvedSolution = null;
+          const pdfClear = document.getElementById('downloadBtn');
+          if (pdfClear) pdfClear.style.display = 'block';
+          resultEl.style.display = 'none';
+          startUserSolveTimer();
+          updateSolveButton();
+          updateSubtitle();
+          refreshLibraryList();
+        } catch (err) {
+          alert(err.message || 'Failed to parse file.');
+        }
+      };
+      reader.onerror = function() { alert('Could not read file.'); };
+      reader.readAsText(file, 'utf-8');
     });
 
     (function init() {
@@ -1151,6 +1615,8 @@
 
       createGrid(initialOrder);
       sizeSelect.value = initialSize;
+      if (sourceSelect) sourceSelect.value = 'curated';
+      updateLibraryHint();
       updateSolveButton();
       updateUndoButton();
 
@@ -1166,6 +1632,10 @@
             initialPuzzle = puzzle;
             puzzleToGrid(puzzle, order, puzzle);
             currentPuzzleName = data.name || (data.filename) || 'Created puzzle';
+            lastSolvedSolution = null;
+            const pdfC = document.getElementById('downloadBtn');
+            if (pdfC) pdfC.style.display = 'block';
+            resultEl.style.display = 'none';
             startUserSolveTimer();
             loadLibrary();
             updateSubtitle();

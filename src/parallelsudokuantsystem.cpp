@@ -26,8 +26,8 @@
 // ----------------------------------------------------------------------------
 // Constructor: Initialize a sub-colony with its own parameters
 // ----------------------------------------------------------------------------
-SubColony::SubColony(int id, int numAnts, float q0, float rho, float pher0, float bestEvap)
-	: colonyId(id), numAnts(numAnts), q0(q0), rho(rho), pher0(pher0), bestEvap(bestEvap), bestPher(0.0f),
+SubColony::SubColony(int id, int numAnts, float q0, float rho, float pher0, float bestEvap, float xi)
+	: colonyId(id), numAnts(numAnts), q0(q0), rho(rho), pher0(pher0), bestEvap(bestEvap), xi(xi), bestPher(0.0f),
 	  iterationBestScore(0), bestSolScore(0), receivedIterationBestScore(0), receivedBestSolScore(0),
 	  currentIteration(0), pher(nullptr), numCells(0), numUnits(0),
 	  contributions(nullptr), hasContribution(nullptr)
@@ -210,7 +210,7 @@ void SubColony::UpdatePheromoneWithCommunication()
 
 void SubColony::LocalPheromoneUpdate(int iCell, int iChoice)
 {
-	pher[iCell][iChoice] = pher[iCell][iChoice] * 0.9f + pher0 * 0.1f;
+	pher[iCell][iChoice] = pher[iCell][iChoice] * (1.0f - xi) + pher0 * xi;
 }
 
 // ----------------------------------------------------------------------------
@@ -308,7 +308,7 @@ void SubColony::UpdateBestSolution(const Board& solution, int score)
 // Constructor: Create the parallel system with N sub-colonies
 // ----------------------------------------------------------------------------
 ParallelSudokuAntSystem::ParallelSudokuAntSystem(int nSubColonies, int numAntsPerColony,
-	float q0, float rho, float pher0, float bestEvap, int safreq, bool saAlwaysAcceptFlag,
+	float q0, float rho, float pher0, float bestEvap, float xi, int safreq, bool saAlwaysAcceptFlag,
 	double saTinit, double saTmin, double saCooling,
 	int commEarlyVal, int commLateVal, int commThresholdVal, bool streamProgressFlag)
 	: numSubColonies(nSubColonies), maxTime(120.0f),
@@ -328,7 +328,7 @@ ParallelSudokuAntSystem::ParallelSudokuAntSystem(int nSubColonies, int numAntsPe
 	// Note: rho is used for both standard ACS global update and communication update
 	for (int i = 0; i < numSubColonies; i++)
 	{
-		subColonies.push_back(new SubColony(i, numAntsPerColony, q0, rho, pher0, bestEvap));
+		subColonies.push_back(new SubColony(i, numAntsPerColony, q0, rho, pher0, bestEvap, xi));
 	}
 	
 	// Initialize master random generator (for random topology matching)

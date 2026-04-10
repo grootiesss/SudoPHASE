@@ -23,6 +23,7 @@ private:
 	float q0;
 	float rho;        // ACS evaporation parameter (used for both standard and communication updates)
 	float pher0;
+	float xi;         // ACS local update: tau <- (1-xi)*tau + xi*tau0 (--xi)
 	
 	Board iterationBest;      // Best solution in current iteration (ΔT_ij^1 - local)
 	Board bestSol;            // Best solution found so far (used in standard Algorithm 0 update)
@@ -56,7 +57,7 @@ public:
 	float bestPher;           // Best pheromone value (for Algorithm 0 standard update)
 	float bestEvap;           // Best pheromone evaporation parameter
 	
-	SubColony(int id, int numAnts, float q0, float rho, float pher0, float bestEvap);
+	SubColony(int id, int numAnts, float q0, float rho, float pher0, float bestEvap, float xi = 0.1f);
 	~SubColony();
 	
 	// Run one iteration of the ant colony
@@ -142,7 +143,7 @@ private:
 
 public:
 	ParallelSudokuAntSystem(int numSubColonies, int numAntsPerColony, 
-	                        float q0, float rho, float pher0, float bestEvap, int safreq = 0, bool saAlwaysAccept = false,
+	                        float q0, float rho, float pher0, float bestEvap, float xi = 0.1f, int safreq = 0, bool saAlwaysAccept = false,
 	                        double saTinit = 1.5, double saTmin = 0.01, double saCooling = 0.995,
 	                        int commEarly = 100, int commLate = 10, int commThreshold = 200, bool streamProgress = false);
 	~ParallelSudokuAntSystem();

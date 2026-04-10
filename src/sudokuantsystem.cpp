@@ -40,10 +40,10 @@ void SudokuAntSystem::UpdatePheromone()
 	}
 }
 
-// ACS local update (Lloyd & Amos Eq. 3): tau_is <- (1-xi)*tau_is + xi*tau0, xi=0.1
+// ACS local update (Lloyd & Amos Eq. 3): tau_is <- (1-xi)*tau_is + xi*tau0 (--xi, default 0.1)
 void SudokuAntSystem::LocalPheromoneUpdate(int iCell, int iChoice)
 {
-	pher[iCell][iChoice] = pher[iCell][iChoice] * 0.9f + pher0*0.1f;
+	pher[iCell][iChoice] = pher[iCell][iChoice] * (1.0f - xi) + pher0 * xi;
 }
 
 bool SudokuAntSystem::Solve(const Board& puzzle, float maxTime )

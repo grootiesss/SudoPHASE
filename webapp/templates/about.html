@@ -6,7 +6,6 @@
   <title>SudoPHASE – About Game</title>
   <style>
     :root {
-      /* Dark theme (default) */
       --bg: #1a1b26;
       --surface: #24283b;
       --text: #c0caf5;
@@ -14,7 +13,6 @@
       --border: #3b4261;
     }
     :root[data-theme="light"] {
-      /* Light theme */
       --bg: #f5f7ff;
       --surface: #ffffff;
       --text: #1f2335;
@@ -31,18 +29,19 @@
       padding: 2rem;
       line-height: 1.6;
     }
-    .wrap { max-width: 640px; margin: 0 auto; }
+    .wrap { max-width: 720px; margin: 0 auto; }
     a.back {
       display: inline-block; color: var(--accent); font-size: 0.95rem; text-decoration: none;
       margin-bottom: 1.5rem;
     }
     a.back:hover { text-decoration: underline; }
     h1 { font-size: 1.75rem; color: var(--accent); margin-bottom: 0.5rem; }
-    h2 { font-size: 1.2rem; color: var(--accent); margin-top: 1.5rem; margin-bottom: 0.5rem; }
+    h2 { font-size: 1.2rem; color: var(--accent); margin-top: 1.75rem; margin-bottom: 0.5rem; }
+    h3 { font-size: 1.05rem; color: var(--accent); margin-top: 1.1rem; margin-bottom: 0.35rem; }
     p { margin: 0.5rem 0; }
     ul { margin: 0.5rem 0; padding-left: 1.5rem; }
     li { margin: 0.25rem 0; }
-    .subtitle { font-size: 0.9rem; opacity: 0.85; margin-bottom: 1.5rem; }
+    .subtitle { font-size: 0.9rem; opacity: 0.85; margin-bottom: 1.25rem; }
 
     .theme-toggle {
       position: fixed;
@@ -66,62 +65,56 @@
   <div class="wrap">
     <a href="/" class="back">← Main menu</a>
     <h1>About SudoPHASE</h1>
-    <p class="subtitle">Parallel Ant Colony + Simulated Annealing · Sudoku solver and player</p>
+    <p class="subtitle">Parallel Ant Colony + Simulated Annealing — Sudoku solver, experiments, and play.</p>
 
-    <h2>Rules of Sudoku</h2>
-    <p>Sudoku is a number-placement puzzle. The goal is to fill the grid so that:</p>
-    <ul>
-      <li><strong>Every row</strong> contains each digit (1–9 for 9×9, 1–16 for 16×16, 1–25 for 25×25) exactly once.</li>
-      <li><strong>Every column</strong> contains each digit exactly once.</li>
-      <li><strong>Every sub-grid (block)</strong> contains each digit exactly once. In 9×9 the blocks are 3×3; in 16×16 they are 4×4; in 25×25 they are 5×5.</li>
-    </ul>
-    <p>Some cells are pre-filled (clues). You fill the empty cells without changing the clues. A valid puzzle has exactly one solution.</p>
-
-    <h2>How to use the application</h2>
+    <h2>User manual</h2>
+    <p>This web application lets you load Sudoku puzzles (9×9, 16×16, 25×25), play them, run the research solver with configurable parameters, create your own puzzles, and import/export puzzles as text or PDF.</p>
 
     <h3>Main menu</h3>
     <ul>
-      <li><strong>Play</strong> — Open the puzzle screen. Choose a puzzle from the library, use one you created, or play an uploaded instance, then solve it yourself or use the solver.</li>
-      <li><strong>Create Puzzle</strong> — Build your own puzzle: pick a size (9×9, 16×16, or 25×25), fill in the clues, then click “Play this puzzle” to open it in Play mode.</li>
-      <li><strong>Upload Puzzle</strong> — Select a text file in the same format as the curated instances; the puzzle is loaded directly into the Play screen.</li>
-      <li><strong>About Game</strong> — This page: rules and usage.</li>
+      <li><strong>Game Mode</strong> — Full-screen play: choose a puzzle, enter digits, undo, clear, optional computer solve with default settings, exports.</li>
+      <li><strong>Experiment Mode</strong> — Same grid plus a side panel: puzzle library, full solver parameters, <strong>SOLVE PUZZLE</strong> / <strong>Stop</strong>, and a <strong>Download</strong> dialog (Initial/Progress × TXT/PDF).</li>
+      <li><strong>Create Puzzle</strong> — Paint clues on the board. The server verifies the puzzle is <strong>solvable within 120 seconds</strong> using <strong>default solver parameters</strong>. Only then can you save a <code>.txt</code> or jump to Game / Experiment Mode. Optional “Save locally” stores the puzzle in your browser for the library.</li>
+      <li><strong>Upload Puzzle</strong> — Page with the <strong>accepted file format</strong>; pick <strong>Game Mode</strong> or <strong>Experiment Mode</strong>, then choose a <code>.txt</code> file.</li>
+      <li><strong>About Game</strong> — This manual.</li>
     </ul>
 
-    <h3>Play screen</h3>
-    <p><strong>Puzzle library (left panel)</strong></p>
+    <h3>Exports and uploads</h3>
     <ul>
-      <li>Select <strong>Size</strong> (9×9, 16×16, or 25×25). The list shows puzzle instances from <code>instances/curated-dataset</code> for that size.</li>
-      <li>Click an instance in the list, then <strong>Load selected</strong> to load it into the grid.</li>
+      <li><strong>Game Mode</strong> — In <strong>Choose puzzle</strong>, set Source to <strong>Upload .txt file</strong> and pick your file. Next to <strong>Stop</strong>, <strong>Download</strong> opens a dialog: export <strong>Initial puzzle</strong> (clues only) or <strong>Progress</strong> (initial + current grid), as <strong>.txt</strong> or <strong>.pdf</strong>.</li>
+      <li><strong>Experiment Mode</strong> — A <strong>Download</strong> button (below <strong>Stop</strong>) opens the same dialog style as Game Mode: <strong>Initial puzzle</strong> or <strong>Progress</strong>, as <strong>.txt</strong> or <strong>.pdf</strong>. Upload is available via <strong>Upload .txt</strong>.</li>
+      <li>File layout matches <code>instances/curated-dataset</code>. Lines starting with <code>#</code> are ignored when loading; extra data after the first full grid may be ignored.</li>
     </ul>
-    <p><strong>Parameters</strong></p>
-    <ul>
-      <li><strong>Timeout (s)</strong> — Maximum time (seconds) the solver may run before stopping.</li>
-      <li><strong>Threads (colonies)</strong> — Number of parallel “colonies” used by the solver (more can be faster on multi-core machines).</li>
-      <li><strong>SOLVE PUZZLE</strong> — Runs the built-in solver (Ant Colony + Simulated Annealing) to fill in the solution. When a solution is found, digits are animated into the grid so you can watch the construction; if the timeout is reached first, the best result is shown.</li>
-    </ul>
-    <p><strong>Grid and input</strong></p>
-    <ul>
-      <li>Click a cell to select it (highlighted border). Pre-filled clues are fixed and cannot be edited or erased.</li>
-      <li>When you select a non-fixed cell, all cells in the same row, column, and block are highlighted as <strong>peers</strong> (with light blue shading in the light theme).</li>
-      <li><strong>Digit buttons</strong> — Click a digit (1–9, 1–16, or 1–25) to place it in the selected cell. Only empty or non-fixed cells accept input.</li>
-      <li><strong>Undo</strong> — Reverts the last change (digit entry, erase, load, or solve).</li>
-      <li><strong>Erase</strong> — Clears the selected cell if it is not a fixed clue.</li>
-      <li>If a digit you place breaks the rules (duplicate in row, column, or block), that digit and any duplicates are <strong>highlighted in red</strong> until you fix them.</li>
-    </ul>
-    <p><strong>Clear</strong> — Empties all cells (under the grid). Use this to start over on the same size; fixed clues are removed.</p>
 
-    <h3>Create Puzzle screen</h3>
+    <h2>How to play — Game Mode</h2>
+    <p>Game Mode is for solving by hand (with optional help from the solver). Typical flow:</p>
+    <ol>
+      <li>Click <strong>Choose puzzle</strong>: pick size and source (curated, <strong>Created puzzles</strong>, or <strong>Upload .txt file</strong>). For library sources, select an instance and <strong>Load</strong>. For upload, use <strong>Choose .txt file</strong>. Clues are fixed and the timer starts.</li>
+      <li>Select a cell (border highlight). Peer cells (same row, column, block) are highlighted. Type with the <strong>digit buttons</strong> — only non-fixed cells change. The app may auto-advance to the next empty cell.</li>
+      <li>Use <strong>Undo</strong> to revert the last edit. <strong>Clear</strong> resets to an empty board (same size).</li>
+      <li>Illegal duplicates show in <strong>red</strong> until fixed.</li>
+      <li><strong>Solve</strong> runs the solver on the <strong>original clue puzzle</strong> (not only your current entries). <strong>Stop</strong> cancels a running solve.</li>
+      <li>Use <strong>Download</strong> (beside <strong>Stop</strong>) to export <strong>Initial</strong> or <strong>Progress</strong> as <strong>.txt</strong> or <strong>.pdf</strong>. After a successful solve, the grid is complete—choose <strong>Progress</strong> to capture the filled board plus the initial clues.</li>
+      <li>When every cell is valid and filled, you see <strong>Puzzle solved!</strong> with your elapsed time.</li>
+    </ol>
+
+    <h2>Experiment Mode (brief)</h2>
     <ul>
-      <li>Choose a size (9×9, 16×16, or 25×25).</li>
-      <li>Fill in the clue cells using the digit buttons. Empty cells will be the ones the player must solve.</li>
-      <li>Click <strong>Play this puzzle</strong> to open the puzzle in Play mode so you can solve it or run the solver.</li>
+      <li>Left panel: <strong>Source</strong> (curated / created), <strong>Size</strong>, instance list, <strong>Load selected</strong>, delete for created entries.</li>
+      <li><strong>Parameters</strong> — Timeout, ants, evaporation, SA temperatures, SA frequency (0 disables SA), cooling rate, thread count, communication settings. Evaporation and cooling must be strictly between 0 and 1 (popup if not).</li>
+      <li><strong>SOLVE PUZZLE</strong> solves the <strong>loaded clue puzzle</strong>. <strong>Stop</strong> cancels the job.</li>
+      <li><strong>Download</strong> (left panel) uses the same options dialog as Game Mode: choose <strong>Initial</strong> or <strong>Progress</strong>, and choose <strong>TXT</strong> or <strong>PDF</strong>.</li>
+      <li><strong>Upload .txt</strong> (under the grid) loads a puzzle file directly into the board.</li>
     </ul>
+
+    <h2>Rules of Sudoku</h2>
+    <p>Fill the grid so that every row, column, and block contains each symbol exactly once. Clues are fixed. Sizes: 9×9 (digits 1–9), 16×16, 25×25 with the symbol sets used in the app.</p>
 
     <h2>Tips</h2>
     <ul>
-      <li>Use the puzzle library to try different instances. Increase timeout or threads if the solver does not finish in time.</li>
-      <li>When creating a puzzle, make sure clues do not repeat in the same row, column, or block; otherwise the puzzle has no valid solution.</li>
-      <li>Use the theme toggle in the top-right corner (Light / Dark) to switch between light and dark modes; your choice is remembered across pages.</li>
+      <li>Hard instances may need a longer <strong>Timeout</strong> or more <strong>Thread Count</strong> in Experiment Mode.</li>
+      <li>Created puzzles must pass server validation — unsolvable or timeout failures are rejected.</li>
+      <li>Theme toggle (top right) is remembered per browser.</li>
     </ul>
   </div>
   <script>

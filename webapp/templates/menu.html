@@ -43,7 +43,7 @@
       flex-direction: column;
       align-items: center;
       gap: 0rem;
-      max-width: 360px;
+      max-width: 440px;
     }
     .logo-wrap {
       display: flex;
@@ -53,18 +53,18 @@
       margin-bottom: 1rem;
     }
     .logo-wrap img {
-      width: 400px;
-      height: 400px;
+      width: 460px;
+      height: 460px;
       display: block;
     }
     .logo-svg {
-      width: 260px;
-      height: 260px;
+      width: 300px;
+      height: 300px;
     }
     .btn-menu {
       width: 100%;
-      padding: 0.7rem 1rem;
-      font-size: 1rem;
+      padding: 0.9rem 1.15rem;
+      font-size: 1.15rem;
       font-weight: 600;
       color: var(--bg);
       background: var(--accent);
@@ -87,7 +87,7 @@
       appearance: none;
     }
     a.btn-menu { font-weight: 600; }
-    .buttons { width: 100%; display: flex; flex-direction: column; gap: 0.5rem; }
+    .buttons { width: 100%; display: flex; flex-direction: column; gap: 0.65rem; }
 
     .theme-toggle {
       position: fixed;
@@ -123,10 +123,10 @@
       </svg>
     </div>
     <nav class="buttons">
-      <a href="{{ url_for('play_page') }}" class="btn-menu">Play</a>
+      <a href="{{ url_for('game_page') }}" class="btn-menu">Game Mode</a>
+      <a href="{{ url_for('play_page') }}" class="btn-menu">Experiment Mode</a>
       <a href="{{ url_for('create_page') }}" class="btn-menu">Create Puzzle</a>
-      <button type="button" class="btn-menu" id="uploadBtn">Upload Puzzle</button>
-      <input type="file" id="uploadInput" accept=".txt" style="display: none;">
+      <a href="{{ url_for('upload_page') }}" class="btn-menu">Upload Puzzle</a>
       <a href="{{ url_for('about_page') }}" class="btn-menu">About Game</a>
     </nav>
   </div>
@@ -154,57 +154,6 @@
     }
 
     initThemeToggle();
-
-    document.getElementById('uploadBtn').addEventListener('click', function() {
-      document.getElementById('uploadInput').click();
-    });
-    document.getElementById('uploadInput').addEventListener('change', function(e) {
-      const file = e.target.files && e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = function() {
-        try {
-          const text = reader.result;
-          const lines = text.split(/\r?\n/).map(function(l) { return l.trim(); }).filter(function(l) { return l.length; });
-          if (lines.length < 2) throw new Error('Invalid instance file: need at least order and idum line');
-          const order = parseInt(lines[0], 10);
-          if (![3, 4, 5].includes(order)) throw new Error('Unsupported order; use 3, 4, or 5');
-          const numCells = Math.pow(order, 4);
-          const values = [];
-          for (let i = 2; i < lines.length; i++) {
-            const parts = lines[i].split(/\s+/);
-            for (let j = 0; j < parts.length; j++) {
-              const n = parseInt(parts[j], 10);
-              if (!Number.isNaN(n)) values.push(n);
-            }
-          }
-          if (values.length < numCells) throw new Error('Instance has too few values');
-          const slice = values.slice(0, numCells);
-          const out = [];
-          for (let k = 0; k < slice.length; k++) {
-            const v = slice[k];
-            if (v === -1) { out.push('.'); continue; }
-            if (order === 3) {
-              out.push((v >= 1 && v <= 9) ? String.fromCharCode(48 + v) : '.');
-            } else if (order === 4) {
-              if (v >= 1 && v <= 10) out.push(String.fromCharCode(48 + v - 1));
-              else if (v >= 11 && v <= 16) out.push(String.fromCharCode(97 + v - 11));
-              else out.push('.');
-            } else {
-              out.push((v >= 1 && v <= 25) ? String.fromCharCode(97 + v - 1) : '.');
-            }
-          }
-          const puzzle = out.join('');
-          sessionStorage.setItem('createdPuzzle', JSON.stringify({ order: order, puzzle: puzzle, name: file.name }));
-          window.location.href = '{{ url_for("play_page") }}';
-        } catch (err) {
-          alert(err.message || 'Failed to parse puzzle file.');
-        }
-        e.target.value = '';
-      };
-      reader.onerror = function() { alert('Could not read file.'); e.target.value = ''; };
-      reader.readAsText(file, 'utf-8');
-    });
   </script>
 </body>
 </html>

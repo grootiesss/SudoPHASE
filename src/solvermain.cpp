@@ -87,6 +87,11 @@ int main( int argc, char *argv[] )
 	float q0 = a.GetArg("q0", 0.9f);
 	float rho = a.GetArg("rho", 0.9f);  // ACS rho (used in Alg 0 and Alg 2)
 	float evap = a.GetArg("evap", 0.005f );
+	float xi = a.GetArg("xi", 0.1f);  // ACS local pheromone update: tau <- (1-xi)*tau + xi*tau0 (Lloyd & Amos Eq. 3)
+	if (xi < 0.0f)
+		xi = 0.0f;
+	if (xi > 1.0f)
+		xi = 1.0f;
 	int saFreq = a.GetArg("safreq", 0);  // SA frequency → saFrequency (Stodola et al. sa_freq). 0=disabled; e.g. 100=every 100 iters
 	int saAcceptFlag = a.GetArg("saAccept", 0); // alg 0 and alg 2: 0 = conservative/hybrid (default), 1 = always accept SA result (CP-like)
 	double saTinit = a.GetArg("saTinit", 1.5);
@@ -106,11 +111,11 @@ int main( int argc, char *argv[] )
 	SudokuSolver *solver;
 	
 	if ( algorithm == 0 )
-		solver = new SudokuAntSystem( nAnts, q0, rho, 1.0f/board.CellCount(), evap, saFreq, saAcceptFlag != 0, saTinit, saTmin, saCooling);
+		solver = new SudokuAntSystem( nAnts, q0, rho, 1.0f/board.CellCount(), evap, xi, saFreq, saAcceptFlag != 0, saTinit, saTmin, saCooling);
 	else if ( algorithm == 1 )
 		solver = new BacktrackSearch();
 	else if ( algorithm == 2 )
-		solver = new ParallelSudokuAntSystem( nThreads, nAnts, q0, rho, 1.0f/board.CellCount(), evap, saFreq, saAcceptFlag != 0, saTinit, saTmin, saCooling, commEarly, commLate, commThreshold, streamProgress);
+		solver = new ParallelSudokuAntSystem( nThreads, nAnts, q0, rho, 1.0f/board.CellCount(), evap, xi, saFreq, saAcceptFlag != 0, saTinit, saTmin, saCooling, commEarly, commLate, commThreshold, streamProgress);
 	else
 		solver = new BacktrackSearch();
 

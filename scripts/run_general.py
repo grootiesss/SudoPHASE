@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import itertools
 import os
 import re
 import sys
@@ -18,7 +19,7 @@ import statistics
 from dataclasses import dataclass
 from pathlib import Path
 from subprocess import CompletedProcess, run, PIPE
-from typing import Iterable, List, Optional, Sequence, Tuple
+from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 
 @dataclass(frozen=True)
@@ -184,6 +185,8 @@ def build_solver_command(
         cmd.extend(("--rho", str(args.rho)))
     if args.evap is not None:
         cmd.extend(("--evap", str(args.evap)))
+    if args.alg == 0 or args.alg == 2:
+        cmd.extend(("--xi", str(args.xi)))
     if args.safreq > 0:
         cmd.extend(("--safreq", str(args.safreq)))
     if getattr(args, "sa_accept", 0) == 1:
@@ -301,7 +304,7 @@ def parse_solver_output(stdout: str, stderr: str) -> Tuple[Optional[bool], Optio
 
 def write_csv(output_path: Path, rows: Sequence[dict]) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    fieldnames = ["alg", "puzzle_size", "f%", "instance_id", "instance_path", "ants", "threads", "q0", "rho", "bve", "safreq", "saAccept", "saTinit", "saTmin", "saCooling", "commEarly", "commLate", "commThreshold", "timeout", "success_rate", "time_mean", "time_std", "iter_mean", "with_comm", "without_comm"]
+    fieldnames = ["alg", "puzzle_size", "f%", "instance_id", "instance_path", "ants", "threads", "q0", "rho", "bve", "xi", "safreq", "saAccept", "saTinit", "saTmin", "saCooling", "commEarly", "commLate", "commThreshold", "timeout", "success_rate", "time_mean", "time_std", "iter_mean", "with_comm", "without_comm"]
     with output_path.open("w", newline="", encoding="utf-8") as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
@@ -313,127 +316,101 @@ def compute_summary(total: int, successes: int, times: Sequence[float]) -> Tuple
     return total, successes, round(avg_time, 5)
 
 
-def summarize_group(size_label: str, fixed_percentage: Optional[int], stats: dict, args: argparse.Namespace, instance_id: Optional[int] = None, instance_path: Optional[str] = None) -> dict:
-    total = stats.get("total", 0)
-    if total == 0:
-        return {}
+def parse_multi_value_string(raw_value: str) -> List[str]:
+    return [token.strip() for token in raw_value.split(",") if token.strip()]
 
-    successes = stats.get("successes", 0)
-    fails = stats.get("fails", 0)
-    times = stats.get("times", [])
-    iterations = stats.get("iterations", [])
-    with_comm = stats.get("with_comm", 0)
-    without_comm = stats.get("without_comm", 0)
-    success_rate = (successes / total) * 100.0 if total else 0.0
-    average_time = round(sum(times) / len(times), 5) if times else 0.0
-    time_std = round(statistics.pstdev(times), 5) if len(times) > 1 else 0.0
-    average_iter = round(sum(iterations) / len(iterations), 2) if iterations else 0.0
 
-    label = size_label
-    if fixed_percentage is not None:
-        label = f"{label} @ {fixed_percentage}% fixed"
+def parse_sweep_args(raw_sweeps: Optional[Sequence[str]], parser: argparse.ArgumentParser) -> List[Dict[str, object]]:
+    if not raw_sweeps:
+        return [{}]
 
-    # Build summary message
-    summary_msg = f"Summary {label}: success={successes}, fail={fails}, success_rate={success_rate:.2f}%, avg_time={average_time:.5f}s"
-    
-    if iterations:
-        summary_msg += f", avg_iter={average_iter:.2f}"
-    
-    if args.alg == 2 and (with_comm > 0 or without_comm > 0):
-        summary_msg += f", comm={with_comm}/{with_comm + without_comm}"
-    
-    print(summary_msg)
-    sys.stdout.flush()  # Force immediate output to prevent timing issues
-
-    # Get actual ant count (default is 10)
-    actual_ants = args.ants if args.ants is not None else 10
-    
-    # Get actual threads count (default is 4)
-    actual_threads = args.threads if args.threads is not None else 4
-
-    return {
-        "alg": args.alg,
-        "puzzle_size": size_label,
-        "f%": fixed_percentage if fixed_percentage is not None else "",
-        "instance_id": instance_id if instance_id is not None else "",
-        "instance_path": instance_path if instance_path is not None else "",
-        "ants": actual_ants,
-        "threads": actual_threads,
-        "q0": args.q0,
-        "rho": args.rho,
-        "bve": args.evap,
-        "safreq": args.safreq if (args.alg == 0 or args.alg == 2) else "",
-        "saAccept": args.sa_accept if (args.alg == 0 or args.alg == 2) else "",
-        "saTinit": args.sa_tinit if (args.alg == 0 or args.alg == 2) else "",
-        "saTmin": args.sa_tmin if (args.alg == 0 or args.alg == 2) else "",
-        "saCooling": args.sa_cooling if (args.alg == 0 or args.alg == 2) else "",
-        "commEarly": args.comm_early if args.alg == 2 else "",
-        "commLate": args.comm_late if args.alg == 2 else "",
-        "commThreshold": args.comm_threshold if args.alg == 2 else "",
-        "timeout": args.timeout,
-        "success_rate": round(success_rate, 2),
-        "time_mean": average_time,
-        "time_std": time_std,
-        "iter_mean": average_iter if (args.alg == 0 or args.alg == 1 or args.alg == 2) else "",
-        "with_comm": with_comm if args.alg == 2 else "",
-        "without_comm": without_comm if args.alg == 2 else "",
+    valid_param_parsers = {
+        "alg": int,
+        "timeout": float,
+        "ants": int,
+        "threads": int,
+        "q0": float,
+        "rho": float,
+        "evap": float,
+        "xi": float,
+        "safreq": int,
+        "sa_accept": int,
+        "sa_tinit": float,
+        "sa_tmin": float,
+        "sa_cooling": float,
+        "comm_early": int,
+        "comm_late": int,
+        "comm_threshold": int,
+        "logic_runs": int,
+        "database16x16_runs": int,
+        "database9x9_runs": int,
+        "database25x25_runs": int,
+        "solver_timeout": float,
+    }
+    alias_to_dest = {
+        "saaccept": "sa_accept",
+        "satinit": "sa_tinit",
+        "satmin": "sa_tmin",
+        "sacooling": "sa_cooling",
+        "commearly": "comm_early",
+        "commlate": "comm_late",
+        "commthreshold": "comm_threshold",
+        "database16x16-runs": "database16x16_runs",
+        "database9x9-runs": "database9x9_runs",
+        "database25x25-runs": "database25x25_runs",
+        "solver-timeout": "solver_timeout",
     }
 
+    per_param_values: Dict[str, List[object]] = {}
+    for entry in raw_sweeps:
+        if "=" not in entry:
+            parser.error(f"Invalid --sweep entry '{entry}'. Expected format: key=v1,v2,...")
+        key, raw_values = entry.split("=", 1)
+        key_norm = key.strip().replace("-", "_").lower()
+        key_norm = alias_to_dest.get(key_norm, key_norm)
+        if key_norm not in valid_param_parsers:
+            parser.error(
+                f"Unsupported --sweep parameter '{key}'. "
+                f"Supported: {', '.join(sorted(valid_param_parsers.keys()))}"
+            )
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description="Run all general Sudoku instances through the solver.")
-    parser.add_argument("--instances-root", default=None, help="Folder containing instances (default: runs instances/general, instances/logic-solvable, and instances/16x16-database)")
-    parser.add_argument("--solver", default=None, help="Path to the solver executable (default: auto-detect)")
-    parser.add_argument("--output", default="results/general_metrics.csv", help="Destination CSV file for metrics. Use a distinct path per run (e.g. results/9x9_range1.csv) to avoid overwriting.")
-    parser.add_argument("--alg", type=int, default=0, help="Solver algorithm (0=ACS, 1=backtracking).")
-    parser.add_argument("--timeout", type=float, default=120.0, help="Timeout per puzzle in seconds (default: 120).")
-    parser.add_argument("--ants", type=int, default=None, help="Override number of ants (ACS only).")
-    parser.add_argument("--threads", type=int, default=None, help="Number of threads (parallel colonies) for parallel ACS (alg=2, default: 4).")
-    parser.add_argument("--q0", type=float, default=0.9, help="Override ACS q0 parameter.")
-    parser.add_argument("--rho", type=float, default=0.9, help="Override ACS rho parameter.")
-    parser.add_argument("--evap", type=float, default=0.005, help="Override ACS evaporation parameter.")
-    parser.add_argument("--safreq", type=int, default=0, help="Simulated Annealing frequency - apply SA every n iterations (0 = disabled, default: 0).")
-    parser.add_argument("--saAccept", type=int, default=0, dest="sa_accept", choices=[0, 1], help="SA acceptance: 0=conservative/hybrid (default), 1=always accept SA result (CP-like). Applies to alg 0 and alg 2.")
-    parser.add_argument("--saTinit", type=float, default=1.5, dest="sa_tinit", help="SA initial temperature (default: 1.5).")
-    parser.add_argument("--saTmin", type=float, default=0.01, dest="sa_tmin", help="SA stopping temperature (default: 0.01).")
-    parser.add_argument("--saCooling", type=float, default=0.995, dest="sa_cooling", help="SA cooling rate per step (default: 0.995).")
-    parser.add_argument("--commEarly", type=int, default=100, dest="comm_early", help="Parallel ACS (alg=2): communication interval when iter < commThreshold (default: 100).")
-    parser.add_argument("--commLate", type=int, default=10, dest="comm_late", help="Parallel ACS (alg=2): communication interval when iter >= commThreshold (default: 10).")
-    parser.add_argument("--commThreshold", type=int, default=200, dest="comm_threshold", help="Parallel ACS (alg=2): iteration at which to switch from commEarly to commLate (default: 200).")
-    parser.add_argument("--limit", type=int, default=None, help="Optional cap on number of instances to process.")
-    parser.add_argument("--range-start", dest="range_start", default=None, help="Include only instances with stem >= this (e.g. 2020_00004 or 16x16_02203). Use with --range-end.")
-    parser.add_argument("--range-end", dest="range_end", default=None, help="Include only instances with stem <= this (e.g. 2020_00483 or 16x16_02436). Use with --range-start.")
-    parser.add_argument("--puzzle-size", dest="puzzle_sizes", nargs="+", choices=["9x9", "16x16", "25x25"], help="Filter by puzzle size(s), e.g. --puzzle-size 25x25.")
-    parser.add_argument("--fixed-percentage", dest="fixed_percentages", type=str, nargs="+", help="Filter by fixed-cell percentage(s). Supports space-separated (e.g., --fixed-percentage 40 45 50) or comma-separated (e.g., --fixed-percentage 40,45,50).")
-    parser.add_argument("--solver-timeout", type=float, default=None, help="Wall-clock timeout applied to each solver invocation.")
-    parser.add_argument("--solver-verbose", action="store_true", help="Pass --verbose to the solver binary.")
-    parser.add_argument("--verbose", action="store_true", default=True, help="Print per-instance progress to the console (default: True).")
-    parser.add_argument("--no-verbose", dest="verbose", action="store_false", help="Disable per-instance progress output.")
-    parser.add_argument("--logic-runs", type=int, default=100, help="Number of runs for logic-solvable instances (default: 100). 16x16-database instances always run once by default.")
-    parser.add_argument(
-        "--database16x16-runs",
-        type=int,
-        default=1,
-        dest="database16x16_runs",
-        help="Number of runs for 16x16-database instances (default: 1). Use --database16x16-runs 100 to run each puzzle 100 times.",
-    )
-    parser.add_argument(
-        "--database9x9-runs",
-        type=int,
-        default=1,
-        dest="database9x9_runs",
-        help="Number of runs for 9x9-database instances (default: 1). Use --database9x9-runs 100 to run each puzzle 100 times.",
-    )
-    parser.add_argument(
-        "--database25x25-runs",
-        type=int,
-        default=1,
-        dest="database25x25_runs",
-        help="Number of runs for 25x25-database instances (default: 1). Use --database25x25-runs 100 to run each puzzle 100 times.",
-    )
+        value_parser = valid_param_parsers[key_norm]
+        parsed_values: List[object] = []
+        for token in parse_multi_value_string(raw_values):
+            try:
+                parsed_values.append(value_parser(token))
+            except ValueError as exc:
+                parser.error(f"Invalid value '{token}' for --sweep {key}: {exc}")
+        if not parsed_values:
+            parser.error(f"--sweep {key} has no valid values.")
 
-    args = parser.parse_args()
-    
+        if key_norm == "sa_accept":
+            invalid_sa_accept = [v for v in parsed_values if v not in (0, 1)]
+            if invalid_sa_accept:
+                parser.error(f"--sweep sa_accept only accepts 0 or 1. Got: {invalid_sa_accept}")
+
+        if key_norm in per_param_values:
+            per_param_values[key_norm].extend(parsed_values)
+        else:
+            per_param_values[key_norm] = parsed_values
+
+    keys = sorted(per_param_values.keys())
+    value_lists = [per_param_values[k] for k in keys]
+    return [dict(zip(keys, values)) for values in itertools.product(*value_lists)]
+
+
+def build_output_path_for_sweep(base_output: str, sweep_idx: int, total_sweeps: int, overrides: Dict[str, object]) -> str:
+    if total_sweeps <= 1:
+        return base_output
+
+    base_path = Path(base_output)
+    suffix_parts = [f"{k}-{str(v).replace('.', 'p')}" for k, v in sorted(overrides.items())]
+    suffix = "__".join(suffix_parts) if suffix_parts else f"run-{sweep_idx + 1}"
+    filename = f"{base_path.stem}__{suffix}{base_path.suffix}"
+    return str(base_path.with_name(filename))
+
+
+def execute_run(args: argparse.Namespace) -> int:
     # Process fixed_percentages to handle both space-separated and comma-separated formats
     if args.fixed_percentages:
         processed_percentages = []
@@ -543,7 +520,7 @@ def main() -> int:
             and not is_9x9_database
             and not is_25x25_database
         )
-        
+
         # Determine number of runs based on instance type
         if is_16x16_database:
             num_runs = args.database16x16_runs
@@ -555,16 +532,16 @@ def main() -> int:
             num_runs = args.logic_runs
         else:
             num_runs = 1  # General instances always run once
-        
+
         # Group key for statistics
-        # For *-database (9x9, 16x16, 25x25), each instance gets its own group → one CSV row per instance.
+        # For *-database (9x9, 16x16, 25x25), each instance gets its own group -> one CSV row per instance.
         # For other instances, group by (size_label, fixed_percentage).
         if is_16x16_database or is_25x25_database or is_9x9_database:
             instance_identifier = metadata.instance_id if metadata.instance_id is not None else metadata.relative_path
             group_key = (metadata.size_label, metadata.fixed_percentage, instance_identifier)
         else:
             group_key = (metadata.size_label, metadata.fixed_percentage)
-        
+
         # If group key changed, summarize the previous group
         if current_group_key is not None and group_key != current_group_key:
             # Extract instance info from previous group key for per-instance (database) format
@@ -579,12 +556,12 @@ def main() -> int:
             if row:
                 group_rows.append(row)
             group_stats = {"total": 0, "successes": 0, "fails": 0, "times": [], "iterations": [], "with_comm": 0, "without_comm": 0}
-        
+
         if current_group_key is None:
             current_group_key = group_key
         elif group_key != current_group_key:
             current_group_key = group_key
-        
+
         # Run the puzzle num_runs times (100 for logic-solvable, 1 for general)
         for run_num in range(1, num_runs + 1):
             cmd = build_solver_command(solver_path, metadata.path, repo_root, args)
@@ -670,7 +647,7 @@ def main() -> int:
 
     # Get actual ant count (default is 10)
     actual_ants = args.ants if args.ants is not None else 10
-    
+
     # Get actual threads count (default is 4)
     actual_threads = args.threads if args.threads is not None else 4
 
@@ -688,6 +665,7 @@ def main() -> int:
     print(f"rho             : {args.rho}")
     print(f"bve             : {args.evap}")
     if args.alg == 0 or args.alg == 2:
+        print(f"xi (local AC)   : {args.xi}")
         print(f"SA frequency    : {args.safreq} ({'enabled' if args.safreq > 0 else 'disabled'})")
         print(f"SA accept       : {args.sa_accept} ({'always accept (CP-like)' if args.sa_accept == 1 else 'conservative/hybrid'})")
         print(f"SA Tinit        : {args.sa_tinit}")
@@ -709,10 +687,166 @@ def main() -> int:
             print(f"With comm       : {overall_with_comm}/{overall_with_comm + overall_without_comm} ({(overall_with_comm / (overall_with_comm + overall_without_comm) * 100.0):.1f}%)")
     else:
         print(f"Average time    : n/a")
-    
+
     sys.stdout.flush()  # Force immediate output to prevent timing issues
 
     return 0
+
+
+def summarize_group(size_label: str, fixed_percentage: Optional[int], stats: dict, args: argparse.Namespace, instance_id: Optional[int] = None, instance_path: Optional[str] = None) -> dict:
+    total = stats.get("total", 0)
+    if total == 0:
+        return {}
+
+    successes = stats.get("successes", 0)
+    fails = stats.get("fails", 0)
+    times = stats.get("times", [])
+    iterations = stats.get("iterations", [])
+    with_comm = stats.get("with_comm", 0)
+    without_comm = stats.get("without_comm", 0)
+    success_rate = (successes / total) * 100.0 if total else 0.0
+    average_time = round(sum(times) / len(times), 5) if times else 0.0
+    time_std = round(statistics.pstdev(times), 5) if len(times) > 1 else 0.0
+    average_iter = round(sum(iterations) / len(iterations), 2) if iterations else 0.0
+
+    label = size_label
+    if fixed_percentage is not None:
+        label = f"{label} @ {fixed_percentage}% fixed"
+
+    # Build summary message
+    summary_msg = f"Summary {label}: success={successes}, fail={fails}, success_rate={success_rate:.2f}%, avg_time={average_time:.5f}s"
+    
+    if iterations:
+        summary_msg += f", avg_iter={average_iter:.2f}"
+    
+    if args.alg == 2 and (with_comm > 0 or without_comm > 0):
+        summary_msg += f", comm={with_comm}/{with_comm + without_comm}"
+    
+    print(summary_msg)
+    sys.stdout.flush()  # Force immediate output to prevent timing issues
+
+    # Get actual ant count (default is 10)
+    actual_ants = args.ants if args.ants is not None else 10
+    
+    # Get actual threads count (default is 4)
+    actual_threads = args.threads if args.threads is not None else 4
+
+    return {
+        "alg": args.alg,
+        "puzzle_size": size_label,
+        "f%": fixed_percentage if fixed_percentage is not None else "",
+        "instance_id": instance_id if instance_id is not None else "",
+        "instance_path": instance_path if instance_path is not None else "",
+        "ants": actual_ants,
+        "threads": actual_threads,
+        "q0": args.q0,
+        "rho": args.rho,
+        "bve": args.evap,
+        "xi": args.xi if (args.alg == 0 or args.alg == 2) else "",
+        "safreq": args.safreq if (args.alg == 0 or args.alg == 2) else "",
+        "saAccept": args.sa_accept if (args.alg == 0 or args.alg == 2) else "",
+        "saTinit": args.sa_tinit if (args.alg == 0 or args.alg == 2) else "",
+        "saTmin": args.sa_tmin if (args.alg == 0 or args.alg == 2) else "",
+        "saCooling": args.sa_cooling if (args.alg == 0 or args.alg == 2) else "",
+        "commEarly": args.comm_early if args.alg == 2 else "",
+        "commLate": args.comm_late if args.alg == 2 else "",
+        "commThreshold": args.comm_threshold if args.alg == 2 else "",
+        "timeout": args.timeout,
+        "success_rate": round(success_rate, 2),
+        "time_mean": average_time,
+        "time_std": time_std,
+        "iter_mean": average_iter if (args.alg == 0 or args.alg == 1 or args.alg == 2) else "",
+        "with_comm": with_comm if args.alg == 2 else "",
+        "without_comm": without_comm if args.alg == 2 else "",
+    }
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Run all general Sudoku instances through the solver.")
+    parser.add_argument("--instances-root", default=None, help="Folder containing instances (default: runs instances/general, instances/logic-solvable, and instances/16x16-database)")
+    parser.add_argument("--solver", default=None, help="Path to the solver executable (default: auto-detect)")
+    parser.add_argument("--output", default="results/general_metrics.csv", help="Destination CSV file for metrics. Use a distinct path per run (e.g. results/9x9_range1.csv) to avoid overwriting.")
+    parser.add_argument("--alg", type=int, default=0, help="Solver algorithm (0=ACS, 1=backtracking).")
+    parser.add_argument("--timeout", type=float, default=120.0, help="Timeout per puzzle in seconds (default: 120).")
+    parser.add_argument("--ants", type=int, default=None, help="Override number of ants (ACS only).")
+    parser.add_argument("--threads", type=int, default=None, help="Number of threads (parallel colonies) for parallel ACS (alg=2, default: 4).")
+    parser.add_argument("--q0", type=float, default=0.9, help="Override ACS q0 parameter.")
+    parser.add_argument("--rho", type=float, default=0.9, help="Override ACS rho parameter.")
+    parser.add_argument("--evap", type=float, default=0.005, help="Override ACS evaporation parameter.")
+    parser.add_argument("--xi", type=float, default=0.1, help="ACS local pheromone update coefficient τ←(1-ξ)τ+ξτ₀ (alg 0 and 2; default: 0.1).")
+    parser.add_argument("--safreq", type=int, default=0, help="Simulated Annealing frequency - apply SA every n iterations (0 = disabled, default: 0).")
+    parser.add_argument("--saAccept", type=int, default=0, dest="sa_accept", choices=[0, 1], help="SA acceptance: 0=conservative/hybrid (default), 1=always accept SA result (CP-like). Applies to alg 0 and alg 2.")
+    parser.add_argument("--saTinit", type=float, default=1.5, dest="sa_tinit", help="SA initial temperature (default: 1.5).")
+    parser.add_argument("--saTmin", type=float, default=0.01, dest="sa_tmin", help="SA stopping temperature (default: 0.01).")
+    parser.add_argument("--saCooling", type=float, default=0.995, dest="sa_cooling", help="SA cooling rate per step (default: 0.995).")
+    parser.add_argument("--commEarly", type=int, default=100, dest="comm_early", help="Parallel ACS (alg=2): communication interval when iter < commThreshold (default: 100).")
+    parser.add_argument("--commLate", type=int, default=10, dest="comm_late", help="Parallel ACS (alg=2): communication interval when iter >= commThreshold (default: 10).")
+    parser.add_argument("--commThreshold", type=int, default=200, dest="comm_threshold", help="Parallel ACS (alg=2): iteration at which to switch from commEarly to commLate (default: 200).")
+    parser.add_argument("--limit", type=int, default=None, help="Optional cap on number of instances to process.")
+    parser.add_argument("--range-start", dest="range_start", default=None, help="Include only instances with stem >= this (e.g. 2020_00004 or 16x16_02203). Use with --range-end.")
+    parser.add_argument("--range-end", dest="range_end", default=None, help="Include only instances with stem <= this (e.g. 2020_00483 or 16x16_02436). Use with --range-start.")
+    parser.add_argument("--puzzle-size", dest="puzzle_sizes", nargs="+", choices=["9x9", "16x16", "25x25"], help="Filter by puzzle size(s), e.g. --puzzle-size 25x25.")
+    parser.add_argument("--fixed-percentage", dest="fixed_percentages", type=str, nargs="+", help="Filter by fixed-cell percentage(s). Supports space-separated (e.g., --fixed-percentage 40 45 50) or comma-separated (e.g., --fixed-percentage 40,45,50).")
+    parser.add_argument("--solver-timeout", type=float, default=None, help="Wall-clock timeout applied to each solver invocation.")
+    parser.add_argument("--solver-verbose", action="store_true", help="Pass --verbose to the solver binary.")
+    parser.add_argument("--verbose", action="store_true", default=True, help="Print per-instance progress to the console (default: True).")
+    parser.add_argument("--no-verbose", dest="verbose", action="store_false", help="Disable per-instance progress output.")
+    parser.add_argument("--logic-runs", type=int, default=100, help="Number of runs for logic-solvable instances (default: 100). 16x16-database instances always run once by default.")
+    parser.add_argument(
+        "--database16x16-runs",
+        type=int,
+        default=1,
+        dest="database16x16_runs",
+        help="Number of runs for 16x16-database instances (default: 1). Use --database16x16-runs 100 to run each puzzle 100 times.",
+    )
+    parser.add_argument(
+        "--database9x9-runs",
+        type=int,
+        default=1,
+        dest="database9x9_runs",
+        help="Number of runs for 9x9-database instances (default: 1). Use --database9x9-runs 100 to run each puzzle 100 times.",
+    )
+    parser.add_argument(
+        "--database25x25-runs",
+        type=int,
+        default=1,
+        dest="database25x25_runs",
+        help="Number of runs for 25x25-database instances (default: 1). Use --database25x25-runs 100 to run each puzzle 100 times.",
+    )
+    parser.add_argument(
+        "--sweep",
+        nargs="+",
+        default=None,
+        help=(
+            "Parameter sweep in key=v1,v2 format. "
+            "Examples: --sweep safreq=25,50,75,100 q0=0.8,0.9"
+        ),
+    )
+
+    args = parser.parse_args()
+    sweep_overrides = parse_sweep_args(args.sweep, parser)
+
+    exit_code = 0
+    total_sweeps = len(sweep_overrides)
+    for idx, overrides in enumerate(sweep_overrides):
+        run_args = argparse.Namespace(**vars(args))
+        for key, value in overrides.items():
+            setattr(run_args, key, value)
+        run_args.output = build_output_path_for_sweep(args.output, idx, total_sweeps, overrides)
+
+        if total_sweeps > 1:
+            print(f"\n===== Sweep {idx + 1}/{total_sweeps} =====")
+            if overrides:
+                rendered = ", ".join(f"{k}={v}" for k, v in sorted(overrides.items()))
+                print(f"Overrides       : {rendered}")
+            print(f"Output CSV      : {run_args.output}")
+            sys.stdout.flush()
+
+        run_code = execute_run(run_args)
+        if run_code != 0:
+            exit_code = run_code
+
+    return exit_code
 
 
 if __name__ == "__main__":
