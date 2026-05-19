@@ -118,7 +118,7 @@
       border: 1px solid var(--cell-border);
       background: var(--bg);
       color: var(--text);
-      font-size: 1.1rem;
+      font-size: clamp(1.2rem, 3vmin, 1.55rem);
       text-align: center;
       padding: 0;
     }
@@ -396,23 +396,23 @@
     <div class="params-container" style="overflow-y:auto; padding-right:0.25rem;">
       <h2 class="params-header" style="font-size: 1.1rem; margin-bottom: 0.5rem;">Parameters</h2>
       <h2 class="params-header">General</h2>
-      <label style="display:flex; justify-content:space-between; align-items:center;">Timeout (s): <input type="number" id="timeout" value="120" min="5" max="600" style="width: 4.5rem; text-align:right;"></label>
+      <label style="display:flex; justify-content:space-between; align-items:center;">Timeout (s): <input type="number" id="timeout" value="180" min="5" max="600" style="width: 4.5rem; text-align:right;"></label>
       
       <h2 class="params-header" style="margin-top:0.5rem; font-size:0.95rem;">Ant Colony System</h2>
-      <label style="display:flex; justify-content:space-between; align-items:center;">Number of Ants: <input type="number" id="ants" value="10" min="1" style="width: 4.5rem; text-align:right;"></label>
-      <label style="display:flex; justify-content:space-between; align-items:center;">Evap. Rate: <input type="number" id="evap" value="0.005" min="0.001" max="0.999" step="0.001" style="width: 4.5rem; text-align:right;"></label>
+      <label style="display:flex; justify-content:space-between; align-items:center;">Number of Ants: <input type="number" id="ants" value="25" min="1" style="width: 4.5rem; text-align:right;"></label>
+      <label style="display:flex; justify-content:space-between; align-items:center;">Evap. Rate: <input type="number" id="evap" value="0.0075" min="0.001" max="0.999" step="0.0001" style="width: 4.5rem; text-align:right;"></label>
 
       <h2 class="params-header" style="margin-top:0.5rem; font-size:0.95rem;">Simulated Annealing</h2>
-      <label style="display:flex; justify-content:space-between; align-items:center;">Initial Temp: <input type="number" id="saTinit" value="1.5" step="0.1" min="0.1" style="width: 4.5rem; text-align:right;"></label>
+      <label style="display:flex; justify-content:space-between; align-items:center;">Initial Temp: <input type="number" id="saTinit" value="5.75" step="0.05" min="0.1" style="width: 4.5rem; text-align:right;"></label>
       <label style="display:flex; justify-content:space-between; align-items:center;">Stopping Temp: <input type="number" id="saTmin" value="0.01" step="0.01" min="0.0001" style="width: 4.5rem; text-align:right;"></label>
-      <label style="display:flex; justify-content:space-between; align-items:center;">Frequency: <input type="number" id="safreq" value="50" min="0" style="width: 4.5rem; text-align:right;"></label>
+      <label style="display:flex; justify-content:space-between; align-items:center;">Frequency: <input type="number" id="safreq" value="25" min="0" style="width: 4.5rem; text-align:right;"></label>
       <label style="display:flex; justify-content:space-between; align-items:center;">Cooling Rate: <input type="number" id="saCooling" value="0.995" min="0.001" max="0.999" step="0.001" style="width: 4.5rem; text-align:right;"></label>
 
       <h2 class="params-header" style="margin-top:0.5rem; font-size:0.95rem;">Multithreaded</h2>
       <label style="display:flex; justify-content:space-between; align-items:center;">Thread Count: <input type="number" id="threads" value="4" min="1" max="32" style="width: 4.5rem; text-align:right;"></label>
-      <label style="display:flex; justify-content:space-between; align-items:center;">Comm. Threshold: <input type="number" id="commThreshold" value="200" min="1" style="width: 4.5rem; text-align:right;"></label>
-      <label style="display:flex; justify-content:space-between; align-items:center;">Early Comm.: <input type="number" id="commEarly" value="100" min="1" style="width: 4.5rem; text-align:right;"></label>
-      <label style="display:flex; justify-content:space-between; align-items:center;">Late Comm.: <input type="number" id="commLate" value="10" min="1" style="width: 4.5rem; text-align:right;"></label>
+      <label style="display:flex; justify-content:space-between; align-items:center;">Comm. Threshold: <input type="number" id="commThreshold" value="100" min="1" style="width: 4.5rem; text-align:right;"></label>
+      <label style="display:flex; justify-content:space-between; align-items:center;">Early Comm.: <input type="number" id="commEarly" value="60" min="1" style="width: 4.5rem; text-align:right;"></label>
+      <label style="display:flex; justify-content:space-between; align-items:center;">Late Comm.: <input type="number" id="commLate" value="25" min="1" style="width: 4.5rem; text-align:right;"></label>
 
       <button type="button" id="solveBtn" class="btn-solve">SOLVE PUZZLE</button>
       <button type="button" id="stopBtn" style="width:100%;margin-top:0.35rem;padding:0.4rem 1rem;background:#f7768e;color:#111827;border:1px solid transparent;" disabled>Stop</button>
@@ -423,14 +423,14 @@
     <a href="/" class="back-link" style="position:absolute;top:1rem;left:1rem;color:var(--accent);font-size:0.9rem;text-decoration:none;">← Main menu</a>
     <h1>SudoPHASE</h1>
     <p class="subtitle" id="subtitle">Puzzle · 0:00</p>
-    <div class="grid-wrap">
+  <div class="grid-wrap">
       <div class="sudoku-grid" id="grid"></div>
-    </div>
+  </div>
     <div class="pad-wrap" id="numberPad"></div>
-    <div class="controls">
-      <button type="button" id="clearBtn">Clear</button>
-    </div>
-    <div class="result" id="result" style="display: none;"></div>
+  <div class="controls">
+    <button type="button" id="clearBtn">Clear</button>
+  </div>
+  <div class="result" id="result" style="display: none;"></div>
     <input type="file" id="uploadPuzzleInput" accept=".txt,text/plain" style="display:none">
   </main>
   <div class="download-modal-backdrop" id="downloadBackdrop">
@@ -491,7 +491,7 @@
     const subtitle = document.getElementById('subtitle');
     const numberPad = document.getElementById('numberPad');
 
-    const SIZES = { '9×9': 3, '16×16': 4, '25×25': 5 };
+    const SIZES = { '9×9': 3, '16×16': 4, '25×25': 5, '9x9': 3, '16x16': 4, '25x25': 5 };
     const CELLS = { 3: 81, 4: 256, 5: 625 };
     const MAX_VAL = { 3: 9, 4: 16, 5: 25 };
     const CREATED_KEY = 'sudophaseCreatedPuzzles';
@@ -720,7 +720,8 @@
       const cells = n * n;
       gridEl.innerHTML = '';
       const maxVal = MAX_VAL[order];
-      const cellSize = order === 3 ? '3rem' : order === 4 ? '2.3rem' : '1.6rem';
+      const cellSize =
+        order === 3 ? 'clamp(3.35rem, 6.8vmin, 4.85rem)' : order === 4 ? 'clamp(2.55rem, 4.4vmin, 3.5rem)' : 'clamp(1.95rem, 3.1vmin, 2.45rem)';
       const fontSize = order === 3 ? '1.55rem' : order === 4 ? '1.15rem' : '0.88rem';
       gridEl.style.gridTemplateColumns = `repeat(${n}, ${cellSize})`;
       gridEl.style.gridTemplateRows = `repeat(${n}, ${cellSize})`;
@@ -925,15 +926,12 @@
     }
 
     function setSolution(puzzle, solution, order, instant) {
-      // Animate construction of the solver's solution so cells fill in progressively.
-      // If instant is true, fill all cells immediately (for real-time best_solution updates).
+      // Always apply the solved grid in one batched update so all cells change together.
       const inputs = gridEl.querySelectorAll('input');
       const n = order * order;
       const len = n * n;
       const puz = String(puzzle).padEnd(len, '.').slice(0, len);
       const sol = String(solution).padEnd(len, '.').slice(0, len);
-
-      const steps = [];
 
       for (let i = 0; i < inputs.length && i < len; i++) {
         let fixed = false;
@@ -946,59 +944,20 @@
         else if (order === 4) val = order4CharToDisplay(sol[i]);
         else val = order5CharToDisplay(sol[i]);
 
-        // Fixed clues stay as-is; we only animate non-fixed cells.
         inputs[i].classList.toggle('fixed', fixed);
         inputs[i].readOnly = fixed;
         if (fixed) {
-          // Ensure fixed cells show their final value immediately.
-          if (!inputs[i].value) inputs[i].value = val;
+          // Keep clue cells visible and stable.
+          inputs[i].value = val;
           inputs[i].classList.remove('filled');
         } else {
-          // Queue this non-fixed cell to be filled as part of the animation.
-          inputs[i].value = '';
-          inputs[i].classList.remove('filled');
-          if (val) steps.push({ index: i, value: val });
+          inputs[i].value = val;
+          inputs[i].classList.toggle('filled', !!val);
         }
       }
-
-      if (instant) {
-        steps.forEach(function(s) {
-          const inp = inputs[s.index];
-          if (inp) { inp.value = s.value; inp.classList.add('filled'); }
-        });
-        recomputeConflicts();
-        clearUserSolveTimer();
-        return;
-      }
-
-      // Shuffle steps so cells are filled in random order.
-      for (let i = steps.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [steps[i], steps[j]] = [steps[j], steps[i]];
-      }
-
-      let stepIndex = 0;
-      const batchSize = 12;   // cells per frame for a faster fill
-      const delayMs = 25;      // delay between frames (ms)
-
-      function applyNextBatch() {
-        if (stepIndex >= steps.length) {
-          recomputeConflicts();
-          clearUserSolveTimer();
-          return;
-        }
-        for (let k = 0; k < batchSize && stepIndex < steps.length; k++, stepIndex++) {
-          const { index, value } = steps[stepIndex];
-          const inp = inputs[index];
-          if (!inp) continue;
-          inp.value = value;
-          inp.classList.add('filled');
-        }
-        recomputeConflicts();
-        setTimeout(applyNextBatch, delayMs);
-      }
-
-      applyNextBatch();
+      recomputeConflicts();
+      // Keep previous behavior: only stop the user timer when applying final solved output.
+      if (!instant) clearUserSolveTimer();
     }
 
     function showResult(obj, isError) {
@@ -1021,7 +980,7 @@
     }
 
     function refreshLibraryList() {
-      const size = sizeSelect.value;
+      const size = normalizeSizeLabel(sizeSelect.value);
       const source = sourceSelect ? sourceSelect.value : 'curated';
       if (loadBtn) loadBtn.disabled = (source === 'upload');
       const sizeLabelWrap = sizeSelect ? sizeSelect.closest('label') : null;
@@ -1052,7 +1011,9 @@
         libraryList.appendChild(li);
         return;
       }
-      const list = (source === 'curated') ? (libraryData[size] || []) : getCreatedPuzzlesBySize(size);
+      const list = (source === 'curated')
+        ? (libraryData[size] || libraryData[String(size).replace(/×/g, 'x')] || [])
+        : getCreatedPuzzlesBySize(size);
       libraryList.innerHTML = '';
       list.forEach((item, idx) => {
         const li = document.createElement('li');
@@ -1079,6 +1040,12 @@
       try { return JSON.parse(text); } catch (_) { return fallback; }
     }
 
+    function normalizeSizeLabel(sizeLabel) {
+      const raw = String(sizeLabel || '').trim();
+      if (!raw) return '9×9';
+      return raw.replace(/x/gi, '×');
+    }
+
     function getCreatedPuzzles() {
       const raw = localStorage.getItem(CREATED_KEY);
       const parsed = raw ? safeJsonParse(raw, []) : [];
@@ -1090,7 +1057,8 @@
     }
 
     function getCreatedPuzzlesBySize(sizeLabel) {
-      const order = SIZES[sizeLabel] || 3;
+      const normalized = normalizeSizeLabel(sizeLabel);
+      const order = SIZES[normalized] || SIZES[sizeLabel] || 3;
       const list = getCreatedPuzzles()
         .filter(p => p && p.order === order && typeof p.puzzle === 'string')
         .map(p => ({
@@ -1273,17 +1241,17 @@
 
     function getParamsSnapshot() {
       return {
-        timeout: parseInt(document.getElementById('timeout').value, 10) || 120,
+        timeout: parseInt(document.getElementById('timeout').value, 10) || 180,
         threads: parseInt(document.getElementById('threads').value, 10) || 4,
-        ants: parseInt(document.getElementById('ants').value, 10) || 10,
-        evap: parseFloat(document.getElementById('evap').value) || 0.005,
-        saTinit: parseFloat(document.getElementById('saTinit').value) || 1.5,
+        ants: parseInt(document.getElementById('ants').value, 10) || 25,
+        evap: parseFloat(document.getElementById('evap').value) || 0.0075,
+        saTinit: parseFloat(document.getElementById('saTinit').value) || 5.75,
         saTmin: parseFloat(document.getElementById('saTmin').value) || 0.01,
-        safreq: parseInt(document.getElementById('safreq').value, 10) || 50,
+        safreq: parseInt(document.getElementById('safreq').value, 10) || 25,
         saCooling: parseFloat(document.getElementById('saCooling').value) || 0.995,
-        commThreshold: parseInt(document.getElementById('commThreshold').value, 10) || 200,
-        commEarly: parseInt(document.getElementById('commEarly').value, 10) || 100,
-        commLate: parseInt(document.getElementById('commLate').value, 10) || 10,
+        commThreshold: parseInt(document.getElementById('commThreshold').value, 10) || 100,
+        commEarly: parseInt(document.getElementById('commEarly').value, 10) || 60,
+        commLate: parseInt(document.getElementById('commLate').value, 10) || 25,
         alg: 2,
         order: currentOrder
       };
@@ -1386,7 +1354,7 @@
       resultEl.innerHTML = 'Solving…';
       resultEl.classList.add('loading');
       try {
-        const timeout = parseInt(document.getElementById('timeout').value, 10) || 120;
+        const timeout = parseInt(document.getElementById('timeout').value, 10) || 180;
         const timeoutMs = (timeout + 20) * 1000;
         const controller = new AbortController();
         const id = setTimeout(() => controller.abort(), timeoutMs);
@@ -1395,26 +1363,26 @@
           // Reset grid back to clues so animation matches what we're solving.
           puzzleToGrid(initialPuzzle, currentOrder, initialPuzzle);
           postRes = await fetch('/api/solve', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              puzzle,
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            puzzle,
               timeout,
               threads: parseInt(document.getElementById('threads').value, 10) || 4,
-              ants: parseInt(document.getElementById('ants').value, 10) || 10,
-              evap: parseFloat(document.getElementById('evap').value) || 0.005,
-              saTinit: parseFloat(document.getElementById('saTinit').value) || 1.5,
+              ants: parseInt(document.getElementById('ants').value, 10) || 25,
+              evap: parseFloat(document.getElementById('evap').value) || 0.0075,
+              saTinit: parseFloat(document.getElementById('saTinit').value) || 5.75,
               saTmin: parseFloat(document.getElementById('saTmin').value) || 0.01,
-              safreq: parseInt(document.getElementById('safreq').value, 10) || 50,
+              safreq: parseInt(document.getElementById('safreq').value, 10) || 25,
               saCooling: parseFloat(document.getElementById('saCooling').value) || 0.995,
-              commThreshold: parseInt(document.getElementById('commThreshold').value, 10) || 200,
-              commEarly: parseInt(document.getElementById('commEarly').value, 10) || 100,
-              commLate: parseInt(document.getElementById('commLate').value, 10) || 10,
+              commThreshold: parseInt(document.getElementById('commThreshold').value, 10) || 100,
+              commEarly: parseInt(document.getElementById('commEarly').value, 10) || 60,
+              commLate: parseInt(document.getElementById('commLate').value, 10) || 25,
               alg: 2,
               order: currentOrder
-            }),
-            signal: controller.signal
-          });
+          }),
+          signal: controller.signal
+        });
           const text = await postRes.text();
           try {
             postData = text ? JSON.parse(text) : {};
@@ -1424,10 +1392,10 @@
             return;
           }
         } finally {
-          clearTimeout(id);
+        clearTimeout(id);
         }
         if (!postRes.ok) {
-          resultEl.classList.remove('loading');
+        resultEl.classList.remove('loading');
           showResult(postData && postData.error ? postData : { error: 'Server error ' + postRes.status }, true);
           return;
         }
@@ -1441,8 +1409,8 @@
               try {
                 if (cancelRequested) {
                   resolve({ status: 'error', result: { error: 'Cancelled by user' } });
-                  return;
-                }
+          return;
+        }
                 if (Date.now() > deadline) {
                   reject(new Error('Request timed out'));
                   return;
@@ -1480,15 +1448,15 @@
               lastSolvedParams = {
                 timeout,
                 threads: parseInt(document.getElementById('threads').value, 10) || 4,
-                ants: parseInt(document.getElementById('ants').value, 10) || 10,
-                evap: parseFloat(document.getElementById('evap').value) || 0.005,
-                saTinit: parseFloat(document.getElementById('saTinit').value) || 1.5,
+                ants: parseInt(document.getElementById('ants').value, 10) || 25,
+                evap: parseFloat(document.getElementById('evap').value) || 0.0075,
+                saTinit: parseFloat(document.getElementById('saTinit').value) || 5.75,
                 saTmin: parseFloat(document.getElementById('saTmin').value) || 0.01,
-                safreq: parseInt(document.getElementById('safreq').value, 10) || 50,
+                safreq: parseInt(document.getElementById('safreq').value, 10) || 25,
                 saCooling: parseFloat(document.getElementById('saCooling').value) || 0.995,
-                commThreshold: parseInt(document.getElementById('commThreshold').value, 10) || 200,
-                commEarly: parseInt(document.getElementById('commEarly').value, 10) || 100,
-                commLate: parseInt(document.getElementById('commLate').value, 10) || 10,
+                commThreshold: parseInt(document.getElementById('commThreshold').value, 10) || 100,
+                commEarly: parseInt(document.getElementById('commEarly').value, 10) || 60,
+                commLate: parseInt(document.getElementById('commLate').value, 10) || 25,
                 alg: 2,
                 order: currentOrder
               };
@@ -1560,11 +1528,14 @@
     }
 
     clearBtn.addEventListener('click', () => {
-      const len = CELLS[currentOrder] || 81;
       snapshotGrid();
-      initialPuzzle = '.'.repeat(len);
-      puzzleToGrid(initialPuzzle, currentOrder, initialPuzzle);
-      currentPuzzleName = 'Empty grid';
+      const inputs = gridEl.querySelectorAll('input');
+      inputs.forEach((cell) => {
+        if (cell.classList.contains('fixed')) return;
+        cell.value = '';
+        cell.classList.remove('filled', 'conflict');
+      });
+      recomputeConflicts();
       resultEl.style.display = 'none';
       lastSolvedSolution = null;
       const pdfClear = document.getElementById('downloadBtn');

@@ -81,29 +81,33 @@ int main( int argc, char *argv[] )
 	Board board(puzzleString);
 
 	int algorithm = a.GetArg("alg", 0);
-	int timeOutSecs = a.GetArg("timeout", 120);
-	int nAnts = a.GetArg("ants", 10);
+	const bool mcas = (algorithm == 2);
+	int timeOutSecs = a.GetArg("timeout", mcas ? 180 : 120);
+	int nAnts = a.GetArg("ants", mcas ? 25 : 10);
 	int nThreads = a.GetArg("threads", 4);
-	float q0 = a.GetArg("q0", 0.9f);
-	float rho = a.GetArg("rho", 0.9f);  // ACS rho (used in Alg 0 and Alg 2)
-	float evap = a.GetArg("evap", 0.005f );
-	float xi = a.GetArg("xi", 0.1f);  // ACS local pheromone update: tau <- (1-xi)*tau + xi*tau0 (Lloyd & Amos Eq. 3)
+	float q0 = a.GetArg("q0", mcas ? 0.7f : 0.9f);
+	float rho = a.GetArg("rho", mcas ? 0.7f : 0.9f);  // ACS rho (used in Alg 0 and Alg 2)
+	float evap = a.GetArg("evap", mcas ? 0.0075f : 0.005f);
+	float xi = a.GetArg("xi", mcas ? 0.5f : 0.1f);  // ACS local pheromone update: tau <- (1-xi)*tau + xi*tau0 (Lloyd & Amos Eq. 3)
 	if (xi < 0.0f)
 		xi = 0.0f;
 	if (xi > 1.0f)
 		xi = 1.0f;
-	int saFreq = a.GetArg("safreq", 0);  // SA frequency → saFrequency (Stodola et al. sa_freq). 0=disabled; e.g. 100=every 100 iters
+	int saFreq = a.GetArg("safreq", mcas ? 25 : 0);  // SA frequency → saFrequency (Stodola et al. sa_freq). 0=disabled; e.g. 100=every 100 iters
 	int saAcceptFlag = a.GetArg("saAccept", 0); // alg 0 and alg 2: 0 = conservative/hybrid (default), 1 = always accept SA result (CP-like)
-	double saTinit = a.GetArg("saTinit", 1.5);
+	double saTinit = a.GetArg("saTinit", mcas ? 5.75 : 1.5);
 	double saTmin = a.GetArg("saTmin", 0.01);
 	double saCooling = a.GetArg("saCooling", 0.995);
-	int commEarly = a.GetArg("commEarly", 100);
-	int commLate = a.GetArg("commLate", 10);
-	int commThreshold = a.GetArg("commThreshold", 200);
+	int commEarly = a.GetArg("commEarly", mcas ? 60 : 100);
+	int commLate = a.GetArg("commLate", mcas ? 25 : 10);
+	int commThreshold = a.GetArg("commThreshold", mcas ? 100 : 200);
 	bool blank = a.GetArg("blank", false );
 	bool verbose = a.GetArg("verbose", 0);
 	bool showInitial = a.GetArg("showinitial", 0);
 	bool streamProgress = a.GetArg("stream", 0);
+	// Alg 2: inter-colony communication (--comm 1 default). --comm 0 skips barriers/exchange; threads are independent ACS colonies.
+	int commFlag = algorithm == 2 ? a.GetArg("comm", 1) : 1;
+	bool interColonyComm = (commFlag != 0);
 	bool success;
 
 	float solTime;
@@ -115,7 +119,7 @@ int main( int argc, char *argv[] )
 	else if ( algorithm == 1 )
 		solver = new BacktrackSearch();
 	else if ( algorithm == 2 )
-		solver = new ParallelSudokuAntSystem( nThreads, nAnts, q0, rho, 1.0f/board.CellCount(), evap, xi, saFreq, saAcceptFlag != 0, saTinit, saTmin, saCooling, commEarly, commLate, commThreshold, streamProgress);
+		solver = new ParallelSudokuAntSystem( nThreads, nAnts, q0, rho, 1.0f/board.CellCount(), evap, xi, saFreq, saAcceptFlag != 0, saTinit, saTmin, saCooling, commEarly, commLate, commThreshold, streamProgress, interColonyComm);
 	else
 		solver = new BacktrackSearch();
 
@@ -183,7 +187,23 @@ int main( int argc, char *argv[] )
 				if ( parallelSolver )
 				{
 					cout << "iterations: " << parallelSolver->GetIterationsCompleted() << endl;
+					cout << "commSetting: " << (parallelSolver->IsCommunicationEnabled() ? "on" : "off") << endl;
 					cout << "communication: " << (parallelSolver->GetCommunicationOccurred() ? "yes" : "no") << endl;
+					const vector<double>& idleTimes = parallelSolver->GetIdleTimePerThreadSeconds();
+					double totalIdle = 0.0;
+					for (size_t i = 0; i < idleTimes.size(); i++)
+					{
+						totalIdle += idleTimes[i];
+						cout << "idleTime_thread_" << i << ": " << fixed << setprecision(5) << idleTimes[i] << endl;
+					}
+					cout << "idleTime_total: " << fixed << setprecision(5) << totalIdle << endl;
+					int commSessions = parallelSolver->GetCommunicationSessions();
+					cout << "commSessions: " << commSessions << endl;
+					if (commSessions > 0)
+					{
+						// Average idle time per communication session (A): sum over threads / number of comm sessions
+						cout << "idleTime_avg: " << fixed << setprecision(5) << (totalIdle / (double)commSessions) << endl;
+					}
 				}
 			}
 		}
@@ -216,7 +236,23 @@ int main( int argc, char *argv[] )
 				if ( parallelSolver )
 				{
 					cout << "iterations: " << parallelSolver->GetIterationsCompleted() << endl;
+					cout << "commSetting: " << (parallelSolver->IsCommunicationEnabled() ? "on" : "off") << endl;
 					cout << "communication: " << (parallelSolver->GetCommunicationOccurred() ? "yes" : "no") << endl;
+					const vector<double>& idleTimes = parallelSolver->GetIdleTimePerThreadSeconds();
+					double totalIdle = 0.0;
+					for (size_t i = 0; i < idleTimes.size(); i++)
+					{
+						totalIdle += idleTimes[i];
+						cout << "idleTime_thread_" << i << ": " << fixed << setprecision(5) << idleTimes[i] << endl;
+					}
+					cout << "idleTime_total: " << fixed << setprecision(5) << totalIdle << endl;
+					int commSessions = parallelSolver->GetCommunicationSessions();
+					cout << "commSessions: " << commSessions << endl;
+					if (commSessions > 0)
+					{
+						// Average idle time per communication session (A): sum over threads / number of comm sessions
+						cout << "idleTime_avg: " << fixed << setprecision(5) << (totalIdle / (double)commSessions) << endl;
+					}
 				}
 			}
 		}

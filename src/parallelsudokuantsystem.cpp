@@ -8,7 +8,7 @@
  * - Ring topology: iteration-best to (i+1) mod n
  * - Random topology: best-so-far via match-array (random permutation)
  * - Three-source pheromone: Delta_tau^1 (local) + Delta_tau^2 (ring) + Delta_tau^3 (random)
- * - Adaptive exchange: interval 100 when iter < 200, else 10
+ * - Adaptive exchange: interval 60 when iter < 100, else 25 (defaults; override with --commEarly/--commLate/--commThreshold)
  ******************************************************************************/
 
 #include "parallelsudokuantsystem.h"
@@ -310,11 +310,12 @@ void SubColony::UpdateBestSolution(const Board& solution, int score)
 ParallelSudokuAntSystem::ParallelSudokuAntSystem(int nSubColonies, int numAntsPerColony,
 	float q0, float rho, float pher0, float bestEvap, float xi, int safreq, bool saAlwaysAcceptFlag,
 	double saTinit, double saTmin, double saCooling,
-	int commEarlyVal, int commLateVal, int commThresholdVal, bool streamProgressFlag)
+	int commEarlyVal, int commLateVal, int commThresholdVal, bool streamProgressFlag, bool communicationEnabledFlag)
 	: numSubColonies(nSubColonies), maxTime(120.0f),
-	  globalBestScore(0), iterationsCompleted(0), communicationOccurred(false), solTime(0.0f), barrier(0), stopFlag(false),
+	  globalBestScore(0), iterationsCompleted(0), communicationOccurred(false), solTime(0.0f), barrier(0), stopFlag(false), communicationSessions(0),
 	  saFrequency(safreq), saAlwaysAccept(saAlwaysAcceptFlag), saTinit(saTinit), saTmin(saTmin), saCooling(saCooling),
-	  commEarly(commEarlyVal), commLate(commLateVal), commThreshold(commThresholdVal), streamProgress(streamProgressFlag)
+	  commEarly(commEarlyVal), commLate(commLateVal), commThreshold(commThresholdVal), streamProgress(streamProgressFlag),
+	  communicationEnabled(communicationEnabledFlag)
 {
 	// === INPUT VALIDATION ===
 	// Ensure at least 1 sub-colony
@@ -323,6 +324,7 @@ ParallelSudokuAntSystem::ParallelSudokuAntSystem(int nSubColonies, int numAntsPe
 		std::cerr << "Warning: numSubColonies must be >= 1. Setting to 1." << std::endl;
 		numSubColonies = 1;
 	}
+	idleTimePerThreadSeconds.assign(numSubColonies, 0.0);
 	
 	// Create N independent sub-colonies
 	// Note: rho is used for both standard ACS global update and communication update
@@ -546,6 +548,7 @@ void ParallelSudokuAntSystem::ExecuteMasterThreadTasks(const Board& puzzle)
 {
 	// Mark that communication occurred
 	communicationOccurred = true;
+	communicationSessions.fetch_add(1);  // Count this barrier communication session (once, by master thread)
 	
 	// Generate random matching for topology 2
 	std::vector<int> matchArray = GenerateMatchArray();
@@ -600,8 +603,10 @@ void ParallelSudokuAntSystem::ExecuteWorkerThreadWait(std::unique_lock<std::mute
 // PerformBarrierSynchronization: Coordinate all threads for communication
 // Implements barrier pattern with master/worker roles
 // ----------------------------------------------------------------------------
-void ParallelSudokuAntSystem::PerformBarrierSynchronization(const Board& puzzle)
+void ParallelSudokuAntSystem::PerformBarrierSynchronization(int colonyId, const Board& puzzle)
 {
+	auto idleStart = std::chrono::steady_clock::now();
+
 	// Pre-check: Don't enter barrier if stop signal already set
 	if (stopFlag.load())
 		return;
@@ -630,6 +635,12 @@ void ParallelSudokuAntSystem::PerformBarrierSynchronization(const Board& puzzle)
 	{
 		// Other threads become WORKERS and wait
 		ExecuteWorkerThreadWait(lock);
+	}
+
+	auto idleEnd = std::chrono::steady_clock::now();
+	if (colonyId >= 0 && colonyId < static_cast<int>(idleTimePerThreadSeconds.size()))
+	{
+		idleTimePerThreadSeconds[colonyId] += std::chrono::duration<double>(idleEnd - idleStart).count();
 	}
 	
 	// === EXIT CRITICAL SECTION ===
@@ -678,10 +689,10 @@ void ParallelSudokuAntSystem::SubColonyWorker(int colonyId, const Board& puzzle)
 		// --- STEP 3: Pheromone Update (Mutually Exclusive) ---
 		// Either standard Algorithm 0 update OR three-source communication update
 		int interval = CalculateInterval(iter);
-		if (iter % interval == 0)
+		if (communicationEnabled && iter % interval == 0)
 		{
 			// --- STEP 3a: Communication Phase (Periodic Barrier Synchronization) ---
-			PerformBarrierSynchronization(puzzle);
+			PerformBarrierSynchronization(colonyId, puzzle);
 			
 			// --- STEP 3b: Three-Source Communication Pheromone Update ---
 			// Uses: local iteration-best + received iteration-best + received best-so-far
@@ -789,6 +800,8 @@ bool ParallelSudokuAntSystem::Solve(const Board& puzzle, float timeLimit)
 	solutionTimer.Reset();
 	stopFlag.store(false);   // Shared stop signal (atomic)
 	barrier.store(0);        // Synchronization counter (atomic)
+	communicationSessions.store(0);
+	std::fill(idleTimePerThreadSeconds.begin(), idleTimePerThreadSeconds.end(), 0.0);
 	
 	globalBest.Copy(puzzle);
 	globalBestScore = puzzle.FixedCellCount();
@@ -847,7 +860,8 @@ void ParallelSudokuAntSystem::PrintColonyDetails()
 		std::cout << "  Colony " << i << ": "
 		          << "iter=" << subColonies[i]->GetCurrentIteration() << ", "
 		          << "iter-best=" << subColonies[i]->GetIterationBestScore() << "/" << subColonies[i]->GetIterationBest().CellCount() << ", "
-		          << "best-so-far=" << subColonies[i]->GetBestSolScore() << "/" << subColonies[i]->GetBestSol().CellCount()
+		          << "best-so-far=" << subColonies[i]->GetBestSolScore() << "/" << subColonies[i]->GetBestSol().CellCount() << ", "
+		          << "idleTime=" << idleTimePerThreadSeconds[i] << "s"
 		          << std::endl;
 	}
 }

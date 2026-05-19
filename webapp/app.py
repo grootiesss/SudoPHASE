@@ -18,7 +18,7 @@ from datetime import datetime
 app = Flask(__name__)
 REPO_ROOT = Path(__file__).resolve().parents[1]
 INSTANCES_ROOT = REPO_ROOT / "instances"
-LIBRARY_FOLDER = "original database"
+LIBRARY_FOLDER = "curated-dataset"
 SIZES = [("9×9", 3, 81), ("16×16", 4, 256), ("25×25", 5, 625)]
 
 # In-memory job store: job_id -> { "status": "pending"|"done"|"error", "result": {...} }
@@ -29,15 +29,15 @@ _job_procs_lock = threading.Lock()
 
 # Default solver parameters (match web UI defaults) for validation / exports
 DEFAULT_SOLVER_PARAMS: dict = {
-    "ants": 10,
-    "evap": 0.005,
-    "saTinit": 1.5,
+    "ants": 25,
+    "evap": 0.0075,
+    "saTinit": 5.75,
     "saTmin": 0.01,
-    "safreq": 50,
+    "safreq": 25,
     "saCooling": 0.995,
-    "commThreshold": 200,
-    "commEarly": 100,
-    "commLate": 10,
+    "commThreshold": 100,
+    "commEarly": 60,
+    "commLate": 25,
 }
 
 
@@ -120,7 +120,7 @@ def _read_instance_file(path: Path) -> tuple[int, str]:
 
 
 def _list_library() -> dict:
-    """List .txt files in instances/original database (recursive) by size."""
+    """List .txt files in instances/curated-dataset (recursive) by size."""
     folder = INSTANCES_ROOT / LIBRARY_FOLDER
     by_size: dict[str, list[dict]] = {label: [] for label, _, _ in SIZES}
     if not folder.is_dir():
@@ -430,13 +430,13 @@ def logo():
 
 @app.route("/api/library", methods=["GET"])
 def library():
-    """GET /api/library -> grouped instances from instances/original database."""
+    """GET /api/library -> grouped instances from instances/curated-dataset."""
     return jsonify(_list_library())
 
 
 @app.route("/api/instance/<path:filename>", methods=["GET"])
 def get_instance(filename: str):
-    """GET /api/instance/<path> from instances/original database -> { order, puzzle }."""
+    """GET /api/instance/<path> from instances/curated-dataset -> { order, puzzle }."""
     parts = filename.replace("\\", "/").strip("/").split("/")
     if any(p in ("", ".", "..") for p in parts):
         return jsonify({"error": "Invalid filename"}), 400
@@ -460,7 +460,7 @@ def get_instance(filename: str):
 @app.route("/api/solve", methods=["POST"])
 def solve():
     """
-    POST JSON: { "puzzle": "...", "timeout": 120, "threads": 4, "alg": 2 }
+    POST JSON: { "puzzle": "...", "timeout": 180, "threads": 4, "alg": 2 }
     Starts the C++ solver in a background thread (multithreaded: threads inside C++).
     Returns: { "job_id": "..." }. Poll GET /api/status/<job_id> for result.
     """
@@ -473,21 +473,21 @@ def solve():
         expected_len = order ** 4
         if len(puzzle) != expected_len:
             return jsonify({"error": f"Puzzle must be {expected_len} characters for order {order}"}), 400
-        timeout = int(data.get("timeout", 120))
+        timeout = int(data.get("timeout", 180))
         threads = int(data.get("threads", 4))
         alg = int(data.get("alg", 2))
 
         extra_params = {}
         for param_name, param_type, default_val in [
-            ("ants", int, 10),
-            ("evap", float, 0.005),
-            ("saTinit", float, 1.5),
+            ("ants", int, 25),
+            ("evap", float, 0.0075),
+            ("saTinit", float, 5.75),
             ("saTmin", float, 0.01),
-            ("safreq", int, 50),
+            ("safreq", int, 25),
             ("saCooling", float, 0.995),
-            ("commThreshold", int, 200),
-            ("commEarly", int, 100),
-            ("commLate", int, 10),
+            ("commThreshold", int, 100),
+            ("commEarly", int, 60),
+            ("commLate", int, 25),
         ]:
             if param_name in data:
                 extra_params[param_name] = param_type(data[param_name])
@@ -564,7 +564,9 @@ def _format_grid(puzzle: str, order: int) -> list[str]:
     lines: list[str] = []
     for r in range(n):
         row = s[r * n : (r + 1) * n]
-        row_disp = " ".join(ch if ch != "." else "." for ch in row)
+        # TXT export follows instance-style numeric encoding:
+        # -1 for blank cells, numeric values for filled cells.
+        row_disp = " ".join(_display_cell(ch, order) if ch != "." else "-1" for ch in row)
         lines.append(row_disp)
     return lines
 
@@ -1002,7 +1004,7 @@ def validate_create():
     expected_len = order**4
     if not puzzle or len(puzzle) != expected_len:
         return jsonify({"valid": False, "error": f"Puzzle must be {expected_len} characters"}), 400
-    timeout = int(data.get("timeout", 120))
+        timeout = int(data.get("timeout", 180))
     try:
         outcome = _run_solver_sync(
             None,

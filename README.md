@@ -1,182 +1,233 @@
-# Multithreaded ACO-SA Sudoku Solver
+# MCAS — Multithreaded, Constraint Propagation, Ant Colony System, Simulated Annealing for Sudoku Solver
 
-A C++ Sudoku solver based on **Ant Colony Optimization (ACS)** with **Simulated Annealing (SA)** and optional **parallel multi-colony** search. The parallel variant uses a ring topology and random matching for pheromone exchange between sub-colonies (RMACO-style).
+This repository implements **ACS** (Ant Colony System) and **MCAS** (multithreaded parallel ACS with ring/random communication and optional simulated annealing) for solving Sudoku puzzles. It includes a C++ solver, batch experiment scripts, and a web interface.
 
-## Description
+**Algorithms (`--alg`):**
 
-This project implements three solving methods:
+| Value | Name | Description |
+|-------|------|-------------|
+| `0` | CA / ACS | Single-colony ant colony system |
+| `1` | Backtrack | Exact backtracking baseline |
+| `2` | MCAS | Parallel colonies (one per thread) with inter-colony communication |
 
-| Algorithm | Description |
-|-----------|-------------|
-| **0** | Single-colony Ant Colony System (ACS) with optional SA (modified). Lloyd & Amos, IEEE Trans. on Games (2021). |
-| **1** | Exact backtracking search (reference / validation). |
-| **2** | **Parallel ACS**: multiple sub-colonies in separate threads; ring + random topology; three-source pheromone update; adaptive exchange interval. Yang et al., "RMACO: a randomly matched parallel ant colony optimization," World Wide Web (2016). |
+---
 
-### Key Features
-- **Scalability**: Solves 9×9, 16×16, and 25×25 Sudoku puzzles (order 3, 4, 5).
-- **Simulated Annealing (SA)**: Optional application every `safreq` iterations; can be customized using specific initial, minimum temperatures, and cooling rates. Acceptance criteria is adjustable via `--saAccept` (conservative/hybrid or CP-like).
-- **Multithreading**: Algorithm 2 implements multiple threaded colonies (`--threads`) with adaptive communication between them (`--commEarly`, `--commLate`, `--commThreshold`).
-- **Interfaces**: Provides a command-line interface, a python script for batch runs, and web/desktop apps for graphical interaction.
+## Prerequisites
 
-## Dataset
+| Component | Purpose |
+|-----------|---------|
+| **Visual Studio 2017+** (Desktop development with C++) | Build `sudoku_ants.exe` |
+| **Python 3.10+** | Batch experiments and Flask backend |
+| **Node.js 18+** and **npm** | React frontend (`webapp_improved`) only |
 
-Puzzle instances are located under the `instances/` directory:
+---
 
-| Folder | Description |
-|--------|-------------|
-| `instances/general` | General logic-solvable instances (`.txt`). |
-| `instances/logic-solvable` | Logic-solvable puzzles. |
-| `instances/9x9-database` | 9×9 instance set (e.g. `9x9_00001.txt`, ranges). |
-| `instances/16x16-database` | 16×16 instance set (e.g. `16x16_02203.txt`). |
-| `instances/25x25-database` | 25×25 instance set. |
-| `instances/curated-dataset` | Optional curated dataset (used on conference paper proposal / may be provided as a zip). |
+## A. Backend — Build, Run, and Test
 
-**Puzzle file format (for `--file`):**
-- **Line 1:** Order of the puzzle (e.g., `3` for 9×9, `4` for 16×16, `5` for 25×25).
-- **Line 2:** Unused integer (e.g., `0`), originally used for fixed-cell percentage value.
-- **Remaining Lines:** Space-separated cell values in row-major order:
-  - `-1` = empty cell
-  - `1`–`9` for 9×9 → digits `1`–`9`
-  - For 16×16: `1`–`10` → `0`–`9`, `11`–`16` → `a`–`f`
-  - For 25×25: `1`–`25` → `a`–`y`
+The backend is the C++ solver (`src/`) plus the Python batch runner (`scripts/run_general.py`). This project does **not** train a machine-learning model; “testing” means compiling the solver and running it on puzzle instances (single runs or batch CSV experiments).
 
-*Example (9×9, first line “3”, second “0”, then 81 values with `-1` for blanks):*
+### A.1. One-time setup (Python)
+
+From the repository root:
+
+```powershell
+cd "path\to\MCAS"
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r webapp\requirements.txt
+```
+
+### A.2. Build the solver (required before any run)
+
+**Option 1 — Visual Studio (recommended on Windows)**
+
+1. Open `vs2017\sudoku_ants.vcxproj` in Visual Studio.
+2. Set configuration to **Release** and platform to **x64**.
+3. Build the project (**Build → Build Solution**).
+
+The executable should appear at:
+
+```
+vs2017\x64\Release\sudoku_ants.exe
+```
+
+**Option 2 — MSBuild from a Developer Command Prompt**
+
+```cmd
+cd path\to\MCAS\vs2017
+msbuild sudoku_ants.vcxproj /p:Configuration=Release /p:Platform=x64
+```
+
+### A.3. Test a single puzzle (command line)
+
+From the repository root, with the venv activated if you use it:
+
+```powershell
+.\vs2017\x64\Release\sudoku_ants.exe --file .\instances\9x9-database\2020_00999.txt --alg 2 --threads 4 --verbose
+```
+
+**Useful flags:**
+
+| Flag | Meaning |
+|------|---------|
+| `--alg 0` | Single-colony ACS |
+| `--alg 1` | Backtracking |
+| `--alg 2` | Parallel MCAS (default for web app) |
+| `--file <path>` | Puzzle file (see format below) |
+| `--puzzle <string>` | Puzzle as one-line string instead of file |
+| `--timeout <seconds>` | Time limit (default 180 for alg 2) |
+| `--ants`, `--threads`, `--q0`, `--rho`, `--evap`, `--xi` | ACS parameters |
+| `--safreq`, `--saTinit`, `--saTmin`, `--saCooling` | Simulated annealing |
+| `--comm 0` or `1` | Inter-colony communication (alg 2 only) |
+| `--verbose` | Detailed output (solution, iterations, idle time) |
+
+**Non-verbose output** (for scripts): first line `0` = success, `1` = fail; second line = solve time in seconds.
+
+**Puzzle file format** (`instances/*/*.txt`):
+
 ```
 3
 0
--1 -1 3 -1 2 -1 -1 -1 -1
-...
+-1 5 3 ...    ← order 3 = 9×9; -1 = empty cell
 ```
 
-## Building
+### A.4. Batch testing / experiments (Python)
 
-**Requirements:** C++11 compiler (e.g., `g++`) with `pthread` support.
+`scripts/run_general.py` runs many instances and writes a CSV summary.
 
-1. From the **repository root**:
-   ```bash
-   mkdir -p obj
-   make -f markdowns/Makefile
-   ```
-   *Note: The makefile uses `g++`. Any compiler supporting C++11 will work. For Windows users, a Visual Studio 2017 project file is included in the `vs2017` folder.*
-
-2. The executable is produced as **`sudokusolver`** in the project root.
-
-**Windows (PowerShell):**
 ```powershell
-New-Item -ItemType Directory -Force -Path obj
-make -f markdowns/Makefile
+python scripts\run_general.py --alg 2 --instances-root instances\9x9-database --output results\test_run.csv --verbose
 ```
-*Note: If you use a Visual Studio build that produces `sudoku_ants.exe`, place it in the repo root or under `vs2017/x64/Release/`.*
 
-## Command-line Arguments
+Examples:
 
-All configuration options use a double-dash prefix.
+```powershell
+# MCAS on a 16×16 range
+python scripts\run_general.py --alg 2 --instances-root instances\16x16-database --range-start 16x16_02203 --range-end 16x16_02436 --output results\16x16_sample.csv
 
-### Core Configuration
-| Argument | Type | Default | Description |
-|----------|------|---------|-------------|
-| `--file` | string | — | Path to puzzle file (order + idum + cell values). |
-| `--puzzle` | string | — | One-line puzzle string (e.g. digits and `.` for empty). Alternative to `--file`. |
-| `--order` | int | — | Order of the grid (e.g. 3 = 9×9). Used with `--blank` for an empty grid. |
-| `--blank` | flag | 0 | If set with `--order`, use a blank puzzle. |
-| `--alg` | int | 0 | Solver: **0** = ACS, **1** = backtracking, **2** = parallel ACS. |
-| `--timeout` | int | 120 | Time limit in seconds. |
+# Single-colony ACS with SA every 50 iterations
+python scripts\run_general.py --alg 0 --safreq 50 --instances-root instances\9x9-database --limit 10 --output results\acs_sa_sample.csv
 
-### Ant Colony System (ACS)
-| Argument | Type | Default | Description |
-|----------|------|---------|-------------|
-| `--ants` | int | 10 | Number of ants per colony (alg 0 and 2). |
-| `--q0` | float | 0.9 | ACS exploitation probability. |
-| `--rho` | float | 0.9 | ACS pheromone decay (global update). |
-| `--evap` | float | 0.005 | Best-so-far evaporation rate. |
+# Parameter sweep
+python scripts\run_general.py --alg 2 --sweep safreq=25,50 threads=2,4 --output results\sweep.csv
+```
 
-### Simulated Annealing (SA)
-| Argument | Type | Default | Description |
-|----------|------|---------|-------------|
-| `--safreq` | int | 0 | Apply SA every N iterations (0 = disabled). |
-| `--saAccept` | int | 0 | **0** = conservative/hybrid, **1** = always accept SA result (CP-like). |
-| `--saTinit` | float | 1.5 | Initial temperature for SA. |
-| `--saTmin` | float | 0.01 | Minimum temperature for SA. |
-| `--saCooling` | float | 0.995 | Cooling rate multiplier for SA. |
+The script auto-detects `vs2017\x64\Release\sudoku_ants.exe`. Override with `--solver path\to\sudoku_ants.exe` if needed.
 
-### Parallel ACS Options (Algorithm 2)
-| Argument | Type | Default | Description |
-|----------|------|---------|-------------|
-| `--threads` | int | 4 | Number of threads (sub-colonies). |
-| `--commEarly` | int | 100 | Early communication interval between colonies. |
-| `--commLate` | int | 10 | Late communication interval between colonies. |
-| `--commThreshold`| int | 200 | Iteration threshold to switch from early to late communication. |
+Experiment outputs are stored under `results/` (main runs, ablations, communication tests).
 
-### Outputs and Display
-| Argument | Type | Default | Description |
-|----------|------|---------|-------------|
-| `--verbose` | flag | 0 | Print full solution grid, time, iterations. |
-| `--showinitial`| flag | 0 | Print initial constrained grid before solving. |
-| `--stream` | flag | 0 | Stream progress text to stdout continuously. |
+### A.5. Backend source layout
 
-## Running the solver on a single puzzle
+| Path | Role |
+|------|------|
+| `src/solvermain.cpp` | CLI entry point |
+| `src/sudokuantsystem.*` | Algorithm 0 (ACS) |
+| `src/parallelsudokuantsystem.*` | Algorithm 2 (MCAS) |
+| `src/simulatedannealing.*` | SA local search |
+| `src/backtracksearch.*` | Algorithm 1 |
+| `src/board.*`, `src/sudokuant.*` | Grid and ants |
+| `scripts/run_general.py` | Batch runner |
 
-Use either a **puzzle file** or a **puzzle string**.
+---
 
-**Using a file (recommended):**
+## B. Frontend — Deploy and Run the Web Application
+
+The web UI uses the **Flask backend** (`webapp/app.py`), which calls `sudoku_ants.exe`. You can use either the **original Flask templates** or the **improved React frontend**.
+
+**Requirement:** Build `sudoku_ants.exe` first (section A.2).
+
+### B.1. Deploy / run — Original web app (Flask only)
+
+Single process: Flask serves HTML and API on port 5000.
+
+```powershell
+cd path\to\MCAS
+.\.venv\Scripts\Activate.ps1
+python webapp\app.py
+```
+
+Open: **http://127.0.0.1:5000**
+
+To listen on all interfaces (e.g. LAN access):
+
+```powershell
+python webapp\app.py --public
+```
+
+### B.2. Deploy / run — Improved web app (React + Flask)
+
+Two terminals are required.
+
+**Terminal 1 — Backend (same as B.1):**
+
+```powershell
+cd path\to\MCAS
+.\.venv\Scripts\Activate.ps1
+python webapp\app.py
+```
+
+**Terminal 2 — Frontend (Vite dev server):**
+
+```powershell
+cd path\to\MCAS\webapp_improved\frontend
+npm install
+npm run dev
+```
+
+Open: **http://127.0.0.1:5174**
+
+API requests to `/api/*` are proxied to Flask at `http://127.0.0.1:5000` (see `webapp_improved/frontend/vite.config.js`).
+
+### B.3. Production-style frontend build (optional)
+
+Build static assets, then preview (Flask must still run on port 5000):
+
+```powershell
+cd webapp_improved\frontend
+npm install
+npm run build
+npm run preview
+```
+
+For a production Flask deployment with gunicorn (Linux/macOS or WSL):
+
 ```bash
-./sudokusolver --file instances/general/example.txt --alg 2 --timeout 60 --verbose
+cd webapp
+gunicorn -w 1 -b 0.0.0.0:5000 app:app
 ```
 
-**Using a puzzle string (9×9: 81 chars, `.` = empty):**
-```bash
-./sudokusolver --puzzle "53..7....6..195....98....6.8...6...34..8.3..17...2...6.6....28....419..5....8..79" --alg 0 --verbose
+Serve the React `frontend/dist` folder with any static file server, or integrate `dist` into Flask if you add static hosting.
+
+### B.4. Frontend source layout
+
+| Path | Role |
+|------|------|
+| `webapp/app.py` | Flask API and original HTML UI |
+| `webapp/templates/` | Jinja pages (index, game, create, upload, about) |
+| `webapp_improved/frontend/` | Vite + React + Tailwind UI |
+| `instances/` | Puzzle libraries used by the web app |
+
+### B.5. Troubleshooting
+
+| Problem | Solution |
+|---------|----------|
+| “Solver binary not found” | Complete section A.2; confirm `vs2017\x64\Release\sudoku_ants.exe` exists |
+| React UI cannot solve puzzles | Start Flask on port 5000 before `npm run dev` |
+| Port 5000 or 5174 in use | Stop the other process or change the port in `app.py` / `vite.config.js` |
+
+---
+
+## Repository structure (summary)
+
+```
+MCAS/
+├── src/                 # C++ solver
+├── vs2017/              # Visual Studio project
+├── scripts/             # Batch experiment runner
+├── instances/           # Puzzle datasets (9×9, 16×16, 25×25)
+├── results/             # Experiment CSV outputs
+├── webapp/              # Flask backend + legacy UI
+└── webapp_improved/     # React frontend (uses webapp API)
 ```
 
-**Minimal output (success + time only):**
-```bash
-./sudokusolver --file instances/general/example.txt --alg 2 --timeout 120
-# Prints: 0 or 1 (success/fail), then solution time in seconds
-```
-
-**Parallel ACS with custom SA and Communication params:**
-```bash
-./sudokusolver --file instances/9x9-database/9x9_00001.txt --alg 2 --threads 8 --ants 10 --safreq 100 --saTinit 2.0 --saTmin 0.05 --saCooling 0.95 --commEarly 150 --commLate 20 --commThreshold 300 --timeout 120 --verbose
-```
-
-**Backtracking (exact) for validation:**
-```bash
-./sudokusolver --file instances/general/example.txt --alg 1 --verbose
-```
-
-## Built-in script: `run_general.py`
-
-The Python script `scripts/run_general.py` runs the solver on multiple instances sequentially and writes CSV metrics tracking execution times, iteration counts, parameters, and successes.
-
-**Solver binary:** The script looks for `sudoku_ants` (or `sudoku_ants.exe` on Windows) in the repo root or under `vs2017/`. If you built with the Makefile you get `sudokusolver`; either copy/symlink it to `sudoku_ants` or pass the path explicitly:
-
-```bash
-python scripts/run_general.py --solver ./sudokusolver --alg 2 --verbose
-```
-
-**Examples:**
-```bash
-# Parallel ACS (alg 2), custom timeout, and output CSV
-python scripts/run_general.py --solver ./sudokusolver --alg 2 --timeout 60 --output results/alg2_60s.csv --verbose
-
-# Run a subset of instances from 16x16 database
-python scripts/run_general.py --instances-root instances/16x16-database --range-start 16x16_02203 --range-end 16x16_02436 --output results/16x16.csv --solver ./sudokusolver
-
-# Filter by puzzle size and fixed-cell percentage
-python scripts/run_general.py --puzzle-size 9x9 --fixed-percentage 40 45 --solver ./sudokusolver --output results/9x9_40_45.csv
-
-# Limit number of instances and configure threads + SA parameters
-python scripts/run_general.py --solver ./sudokusolver --alg 2 --threads 8 --safreq 100 --saAccept 0 --limit 50 --output results/limited.csv
-```
-
-## Deploying as web or desktop application
-
-- **Web app:** From the repo root, run `pip install -r webapp/requirements.txt` and `python webapp/app.py`, then open http://127.0.0.1:5000. The solver runs on the server with `--alg 2` and uses the background threads setting to exploit multiple processors.
-- **Desktop app:** From the repo root, run `python desktop/sudoku_desktop.py`. A Tkinter window opens with a 9×9 grid; set the thread count and click **Solve**. The solver runs locally without any required browser setup. See `desktop/README.md`.
-- **Other stacks:** See `markdowns/DEPLOYMENT_APP.md` for production deployment, Electron, Qt, mobile, etc.
-
-## References
-
-- Lloyd & Amos, IEEE Trans. on Games (2021) — ACS core for Sudoku.
-- Yang et al., "RMACO: a randomly matched parallel ant colony optimization," World Wide Web (2016) — ring + random topology, three-source update, adaptive interval.
-- See `ACO_PAPER_VERIFICATION.md` and `RMACO_PARALLEL_ADAPTATION.md` in the repo for additional verification details.
+---

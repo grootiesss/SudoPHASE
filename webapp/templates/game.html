@@ -45,7 +45,7 @@
       justify-content: center;
       gap: 1.25rem;
       width: 100%;
-      max-width: 1200px;
+      max-width: 1480px;
       flex-wrap: wrap;
     }
     .game-board-main {
@@ -144,7 +144,7 @@
       border: 1px solid var(--cell-border);
       background: var(--bg);
       color: var(--text);
-      font-size: 1.3rem;
+      font-size: clamp(1.35rem, 3.6vmin, 1.75rem);
       text-align: center;
       padding: 0;
     }
@@ -430,17 +430,17 @@
     const CREATED_KEY = 'sudophaseCreatedPuzzles';
 
     const GAME_DEFAULT_PARAMS = {
-      timeout: 120,
+      timeout: 180,
       threads: 4,
-      ants: 10,
-      evap: 0.005,
-      saTinit: 1.5,
+      ants: 25,
+      evap: 0.0075,
+      saTinit: 5.75,
       saTmin: 0.01,
-      safreq: 50,
+      safreq: 25,
       saCooling: 0.995,
-      commThreshold: 200,
-      commEarly: 100,
-      commLate: 10,
+      commThreshold: 100,
+      commEarly: 60,
+      commLate: 25,
       alg: 2
     };
 
@@ -545,7 +545,8 @@
       const n = order * order;
       const cells = n * n;
       gridEl.innerHTML = '';
-      const cellSize = order === 3 ? '3rem' : order === 4 ? '2.3rem' : '1.6rem';
+      const cellSize =
+        order === 3 ? 'clamp(3.35rem, 6.8vmin, 4.85rem)' : order === 4 ? 'clamp(2.55rem, 4.4vmin, 3.5rem)' : 'clamp(1.95rem, 3.1vmin, 2.45rem)';
       const fontSize = order === 3 ? '1.55rem' : order === 4 ? '1.15rem' : '0.88rem';
       gridEl.style.gridTemplateColumns = `repeat(${n}, ${cellSize})`;
       gridEl.style.gridTemplateRows = `repeat(${n}, ${cellSize})`;
@@ -813,11 +814,16 @@
       clearBtn.className = 'pill primary';
       clearBtn.textContent = 'Clear';
       clearBtn.addEventListener('click', () => {
-        const len = CELLS[currentOrder] || 81;
         snapshotGrid();
-        initialPuzzle = '.'.repeat(len);
-        puzzleToGrid(initialPuzzle, currentOrder, initialPuzzle);
-        currentPuzzleName = 'Empty grid';
+        const inputs = gridEl.querySelectorAll('input');
+        inputs.forEach((cell) => {
+          if (cell.classList.contains('fixed')) return;
+          cell.value = '';
+          cell.classList.remove('filled', 'conflict');
+        });
+        recomputeConflicts();
+        resultEl.style.display = 'none';
+        lastSolvedSolution = null;
         updateSubtitle();
       });
       numberPad.appendChild(clearBtn);
@@ -1252,6 +1258,7 @@
       const len = n * n;
       const puz = String(puzzle).padEnd(len, '.').slice(0, len);
       const sol = String(solution).padEnd(len, '.').slice(0, len);
+      const updates = [];
       for (let i = 0; i < inputs.length && i < len; i++) {
         let fixed = false;
         if (order === 3) fixed = puz[i] !== '.' && /[1-9]/.test(puz[i]);
@@ -1263,15 +1270,17 @@
         else if (order === 4) val = order4CharToDisplay(sol[i]);
         else val = order5CharToDisplay(sol[i]);
 
-        inputs[i].classList.toggle('fixed', fixed);
-        inputs[i].readOnly = fixed;
-        if (fixed) {
-          if (!inputs[i].value) inputs[i].value = val;
-          inputs[i].classList.remove('filled');
-        } else {
-          inputs[i].value = val;
-          inputs[i].classList.toggle('filled', !!val);
-        }
+        updates.push({ i, fixed, val });
+      }
+      // Apply all cell mutations in one frame to avoid a visible first-to-last fill.
+      for (const u of updates) {
+        const inp = inputs[u.i];
+        if (!inp) continue;
+        inp.classList.toggle('fixed', u.fixed);
+        inp.readOnly = u.fixed;
+        inp.value = u.val;
+        if (u.fixed) inp.classList.remove('filled');
+        else inp.classList.toggle('filled', !!u.val);
       }
       recomputeConflicts();
     }

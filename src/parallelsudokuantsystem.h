@@ -57,7 +57,7 @@ public:
 	float bestPher;           // Best pheromone value (for Algorithm 0 standard update)
 	float bestEvap;           // Best pheromone evaporation parameter
 	
-	SubColony(int id, int numAnts, float q0, float rho, float pher0, float bestEvap, float xi = 0.1f);
+	SubColony(int id, int numAnts, float q0, float rho, float pher0, float bestEvap, float xi = 0.5f);
 	~SubColony();
 	
 	// Run one iteration of the ant colony
@@ -115,6 +115,8 @@ private:
 	std::condition_variable commCV;
 	std::atomic<int> barrier;
 	std::atomic<bool> stopFlag;
+	std::atomic<int> communicationSessions;  // Number of completed communication (barrier) sessions
+	std::vector<double> idleTimePerThreadSeconds;  // Accumulated barrier idle time per thread
 	
 	// Communication helpers
 	int CalculateInterval(int iteration);
@@ -129,7 +131,7 @@ private:
 	bool CheckTimeout();
 	void ReportProgress(int colonyId, int iteration, SubColony* colony, const Board& puzzle);
 	bool CheckSolutionFound(SubColony* colony);
-	void PerformBarrierSynchronization(const Board& puzzle);
+	void PerformBarrierSynchronization(int colonyId, const Board& puzzle);
 	void ExecuteMasterThreadTasks(const Board& puzzle);
 	void ExecuteWorkerThreadWait(std::unique_lock<std::mutex>& lock);
 	
@@ -140,12 +142,14 @@ private:
 	int commLate;
 	int commThreshold;
 	bool streamProgress;  // If true, output best-so-far solution to stdout during solve (for webapp live display)
+	bool communicationEnabled;  // If false (--comm 0), skip barriers and three-source update; threads are independent ACS colonies
 
 public:
 	ParallelSudokuAntSystem(int numSubColonies, int numAntsPerColony, 
-	                        float q0, float rho, float pher0, float bestEvap, float xi = 0.1f, int safreq = 0, bool saAlwaysAccept = false,
-	                        double saTinit = 1.5, double saTmin = 0.01, double saCooling = 0.995,
-	                        int commEarly = 100, int commLate = 10, int commThreshold = 200, bool streamProgress = false);
+	                        float q0, float rho, float pher0, float bestEvap, float xi = 0.5f, int safreq = 25, bool saAlwaysAccept = false,
+	                        double saTinit = 5.75, double saTmin = 0.01, double saCooling = 0.995,
+	                        int commEarly = 60, int commLate = 25, int commThreshold = 100, bool streamProgress = false,
+	                        bool communicationEnabled = true);
 	~ParallelSudokuAntSystem();
 	
 	virtual bool Solve(const Board& puzzle, float maxTime);
@@ -153,6 +157,9 @@ public:
 	virtual const Board& GetSolution() { return globalBest; }
 	int GetIterationsCompleted() { return iterationsCompleted; }
 	bool GetCommunicationOccurred() { return communicationOccurred; }
+	bool IsCommunicationEnabled() const { return communicationEnabled; }
+	int GetCommunicationSessions() const { return communicationSessions.load(); }
+	const std::vector<double>& GetIdleTimePerThreadSeconds() const { return idleTimePerThreadSeconds; }
 	void PrintColonyDetails();
 };
 
